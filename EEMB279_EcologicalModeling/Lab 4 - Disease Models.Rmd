@@ -1,0 +1,928 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Important Deadlines
+
+**Friday, January 31st by 11:59 pm** -- LAB: Partners for final project identified. Fill out the google sheets below. 
+
+**Friday, January 31st** -- IN LECTURE: The last half of lecture will function as a review session for Midterm 1, so please bring questions for Dr. Moeller if you have them. A study guide has been posted.
+
+  Midterm 1 Study Guide: https://docs.google.com/spreadsheets/d/1vdjhhiZvpsSX7GL4PYt-zTd7SPmqZO3eo9ckuJ42TIU/edit#gid=0
+  
+  Recommended Problems Crowd-sourced Key: https://docs.google.com/document/d/1fcVSKaw6DFTq80zJSRhwbP86tjKotagM8R6LAeiSZmo/edit
+
+**Sunday, February 2nd; 1:00 -3:00 pm, 2221 Noble Hall** -- Review Session 1 (Dr. Moeller and Skylar)
+
+**Tuesday, February 4th; Girvetz 2110 5:30 pm to 7:30 pm** -- Review Session 2 (An, Austen and Kristen)
+
+**Wednesday, February 5** -- IN LECTURE: Midterm 1  
+
+**Wednesday, February 5 by 11:59 pm** -- Paper selection due (first choice and alternate) on this google sheet (https://docs.google.com/spreadsheets/d/1jy0XNL_TJEcsRDWgXR1L2MVZxBUc4PQ1-MMMEB2MwDo/edit?usp=sharing).   
+
+**Thursday, February 6th** -- IN LAB: Appointments with Dr. Moeller, An and Austen in lab about your paper choices. We expect you to -- (1) bring hard copies of both papers, (2) have read both papers, and (3) explain to us why you have chosen this paper (For example -- What interests you about it? What ecological concept(s) does this paper address? Which portion will you analytically develop during your chalk talk? What time series simulation will you code up (and vary a parameter for) in your written report?. Refer to the Project guidelines on Gauchospace for more details!   
+
+Don't have a group yet? Talk to eachother today AND put yourself in the "Group Selection List" on the google sheets below:
+
+  2 pm section signups: https://docs.google.com/spreadsheets/d/1uEuEyLA6weGHXKb6OZGFFoqxurC17CuRvTgQ5hFr_90/edit#gid=0
+  6 pm section signups: https://docs.google.com/spreadsheets/d/1GQhGKgYJQkcZ0_1x-AAMKakq1qyDasEBPcj_QiqEOpc/edit#gid=0
+
+**Monday, February 10th by 11:59 pm** -- Homework 4 (Modeling Spread of Infectious Disease Lab) Due. **Note the change from usual due date. You have an extra five days to complete Homework 4.**   
+
+# EEMB 179: Lab 4 - Modeling the spread of infectious disease
+
+In this lab, we will simulate the spread of an infectious disease, and study how (1) infectiousness, (2) duration of illness, and (3) vaccination impact the potential 'epidemic' nature of the disease.
+
+This lab has 3 parts (plus homework):
+
+First, we will work in small groups (of 3 or 4) to perform a hands-on simulation of disease spread using colored beads. There's hand sanitizer in the classroom as well, so that we can avoid spreading any real infectious disease.
+
+Second, we'll enter the data from our hands-on simulations into a Google Sheet. In particular, you'll enter the total number of infected individuals you had in your colored bead population for each round ("shake!") of the game. We'll plot the data, and be able to visually compare the difference between diseases with different rates of spread and recovery times. Using data from Round 4 of the lab, we'll also be able to see the effects of vaccination.
+
+Third, we'll simulate disease spread using computer models coded in R. This is a much less labor-intensive way of simulating disease spread! That means we'll be able to study the effects of a wide range of parameters (e.g., beta, gamma, and p) in a short amount of time.
+
+# How to Knit tutorial / download desolve
+
+Knitting: https://rmarkdown.rstudio.com/articles_intro.html
+
+```{r}
+#install.packages("deSolve", dependencies = T)
+library(deSolve)
+require(deSolve)
+```
+
+And last, at the end of this script, you'll find the homework assignment for this week. 
+
+# PART ONE: HANDS ON SIMULATION - Find a group and have fun!
+
+# PART TWO: GOOGLE SHEETS DATA VISUALIZATION
+
+Google Sheet for 2pm Lab: https://docs.google.com/spreadsheets/d/16PewVo8l07BbepwmdGEp-PTdwKkxy0_CHGUIcuD-eLE/edit#gid=2012946484
+
+Google Sheet for 6pm Lab: https://docs.google.com/spreadsheets/d/19yJDZS2tiskqi-FGueEHSGc8uLw7P1CFAkXjXlwJd3I/edit#gid=2012946484
+
+# PART THREE: SIMULATING DISEASE COMPUTATIONALLY
+
+Throughout this section, we'll be using the following equations:
+dN/dt = 0
+dS/dt = - beta * S * I
+dI/dt = beta * S * I - gamma * I
+dR/dt = gamma * I
+
+$$
+\begin{align}
+\frac{d N}{dt}  &= 0 \\ 
+\newline
+\frac{d S}{dt} &= -\beta S I\\
+\newline
+\frac{d I}{dt} &= \beta S I - \gamma I\\
+\newline
+\frac{d R}{dt} &= \gamma I\\
+\end{align}
+$$
+
+
+# A. Basic disease simulation using a for loop or an ODE Solver
+
+First, let's set up our parameters
+```{r}
+beta <- 0.01   # infectivity
+gamma <- 0.1  # recovery
+```
+
+Second, let's specify the initial conditions for our simulation
+```{r}
+N <- 100   # population size; because dN/dt = 0, this doesn't change
+I0 <- 1		# initial infected individual
+S0 <- N - I0	# Assuming this is a new disease, everyone else is susceptible
+R0 <- 0 	# Assuming this is a new disease, there are no recovered individuals in the population
+```
+
+Third, we'll set up our storage variables. Note: Now we'll need one for each "state" of the population.
+```{r}
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu1 <- NaN*tset; N.simu1[1] <- N
+I.simu1 <- NaN*tset; I.simu1[1] <- I0
+S.simu1 <- NaN*tset; S.simu1[1] <- S0
+R.simu1 <- NaN*tset; R.simu1[1] <- 0
+```
+
+Fourth, we'll run a for-loop to simulate the dynamic
+```{r}
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu1[i-1]  # to shorten the commands I have to write below, I'm going to have my for loop temporarily store the previous timestep's population distribution as S, I, and R. This will get overwritten with each iteration of the for loop, so it's somewhat inefficient, but it will allow my dS, dI, and dR expressions to be simpler (and make me less prone to error), so I think it's worth it.
+	I <- I.simu1[i-1]
+	R <- R.simu1[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  # This is a way to "check" to make sure that my equations are all correct and I'm not inadvertently adding or removing individuals from my population. This should equal zero all the time!
+	S.simu1[i] <- S + dS
+	I.simu1[i] <- I + dI
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+}
+```
+
+Fifth, we'll plot our output. 
+Let's set some universal colours here:
+```{r}
+Ncol <- 'black'
+Scol <- 'dodgerblue3'
+Icol <- 'coral'
+Rcol <- 'darkgoldenrod4'
+
+plot(x = tset, y = N.simu1, type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals')
+# OK, phew, hopefully that makes it clear that the population size didn't change over time. How else might you check?
+
+sd(N.simu1)
+N.simu1[length(tset)]
+```
+
+Now that we know the total population didn't change, let's look at how individuals moved between classes
+```{r}
+plot(x = tset, y = N.simu1, type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,N*1.2))
+abline(h = 0)
+lines(x = tset, y = S.simu1, col = Scol, lwd = 2)
+lines(x = tset, y = I.simu1, col = Icol, lwd = 2)
+lines(x = tset, y = R.simu1, col = Rcol, lwd = 2)
+legend(x = max(tset)*0.1, y = N*1.2, legend=c('N','S','I','R'),lwd= 2, col=c(Ncol,Scol,Icol,Rcol), horiz=TRUE)
+```
+
+Ordinary Differential Equation (ODE) Solver
+```{r}
+library(deSolve)
+library(ggplot2)
+
+sir.fun <- function (t, x, params) { 
+  S = x[1] 
+  I = x[2]
+  R = x[3]
+  N = x[4]
+  
+  beta = params[1] 
+  gamma = params[2] 
+  
+  dSdt = -beta*S*I
+	dIdt = (beta*S*I)-(gamma*I)
+	dRdt = gamma*I
+	dNdt = dSdt+dIdt+dRdt  
+	
+ return(list(c(dSdt, dIdt, dRdt, dNdt)))
+}
+
+S0 = N - I0 # Initial number of susceptibles
+I0 = 1 # Initial number of infecteds
+R0 = 0 # Initial number of recovered
+N0 = 100 # Total population size
+
+initial_values = c(S=S0, I=I0, R=R0, N=N)
+
+beta = 0.01 # per host per week
+gamma = 0.1 # per week
+parameters = c(beta,gamma)
+
+times = seq(0, 60, length.out = 20000)
+
+results = lsoda(initial_values, times, sir.fun, parameters)
+head(results)
+
+# ODE PLOT
+plot(x = results[, "time"], y = results[, "N"], type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,N*1.2), main = "ODE Solver")
+abline(h = 0)
+lines(x = results[, "time"], y = results[, "S"], col = Scol, lwd = 2)
+lines(x = results[, "time"], y = results[, "I"], col = Icol, lwd = 2)
+lines(x = results[, "time"], y = results[, "R"], col = Rcol, lwd = 2)
+legend(x = max(tset)*0.1, y = N*1.2, legend=c('N','S','I','R'),lwd= 2, col=c(Ncol,Scol,Icol,Rcol), horiz=TRUE)
+
+plot(x = tset, y = N.simu1, type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,N*1.2), main = "for() loop")
+abline(h = 0)
+lines(x = tset, y = S.simu1, col = Scol, lwd = 2)
+lines(x = tset, y = I.simu1, col = Icol, lwd = 2)
+lines(x = tset, y = R.simu1, col = Rcol, lwd = 2)
+legend(x = max(tset)*0.1, y = N*1.2, legend=c('N','S','I','R'),lwd= 2, col=c(Ncol,Scol,Icol,Rcol), horiz=TRUE)
+
+```
+
+Let's compare incidence plots: 
+```{r}
+plot(x = tset, y = I.simu1, type = 'l', las = 1, col = Icol, lwd = 3, xlab = 'Time',ylab='Incidence')
+lines(x = results[, "time"], y = results[, "I"], col = 'black', lwd = 1, lty = 2)
+legend(x = max(tset)*0.6, y = max(I.simu1)*0.9, legend = c('For Loop','ODE Solver'), lwd = 2, col = c(Icol,'black'), lty = c(1,2))
+```
+
+Let compare run times: for() loop or ODE solver?
+```{r}
+tset.test <- seq(from = 0, to = 60, length.out = 20000)
+
+# for() loop run time
+for.loop.time <- system.time(for(i in 2:length(tset.test)){
+	dt <- tset.test[i]-tset.test[i-1]
+	S <- S.simu1[i-1] 
+	I <- I.simu1[i-1]
+	R <- R.simu1[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR 
+	S.simu1[i] <- S + dS
+	I.simu1[i] <- I + dI
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+})
+
+# ODE run time
+ode.time <- system.time(lsoda(initial_values, times, sir.fun, parameters))
+
+# Compare
+for.loop.time
+ode.time
+```
+
+
+Think, Pair, Share 1 :
+
+1. What was the maximum number of people that were sick (i.e., in state I) at any given time? What R command can you use to find out exactly?
+```{r}
+## SOLUTION ##
+max(I.simu1)
+## END SOLUTION ##
+```
+
+2. By the time the disease had run its course (i.e., I had fallen back close to zero), what proportion of the population had been sick at some point? Make a plot of the proportion of individuals that were currently, or had been, sick (i.e., (I + R)/N over time.
+```{r}
+# Because -- 
+# N = S + I + R
+# N - S = I + R
+
+## SOLUTION ##
+(N - S.simu1[length(tset)]) / N  
+# or #
+(I.simu1[length(tset)]+R.simu1[length(tset)]) / N
+
+plot(x = tset, y = (I.simu1+R.simu1)/N, lwd=2, type = 'l', las = 1, ylab = 'Number Infected or Recovered', xlab = 'Time')
+## END SOLUTION ##
+```
+
+3. When was the rate of transmission highest? You can figure this out by making a plot of the new infections over time.
+```{r}
+# because -- 
+# rate of transmission = dI/dt
+# dI/dt = +B * S * I
+
+## SOLUTION ##
+NewInfec <- beta * S.simu1 * I.simu1
+plot(x = tset, y = NewInfec, lwd = 2, type = 'l', las = 1, ylab = 'New Infections', xlab = 'Time')
+max.NewInfec <- max (NewInfec)
+for(i in 1:length(tset)){
+	if(NewInfec[i]==max.NewInfec){
+		T.maxnewinf <- tset[i]
+	}
+}
+T.maxnewinf
+abline(v=T.maxnewinf,lty=2)
+## END SOLUTION ##
+```
+
+# B. Incorporating vaccination
+Let's now consider how we could prevent the spread of this disease through vaccination.
+
+Let's set a vaccination rate p of 0.7, meaning 70% of the population has been vaccinated before this disease arrives 
+```{r}
+p <- 0.7
+```
+
+Now, when we start our simulation, our initial conditions will be different. We'll still assume that we start with one infected individual (I_0 = 1), but now the number of susceptibles is reduced by vaccination.
+```{r}
+V <- N*p # Number vaccinated. This won't change over time.
+S0 <- N - V - I0 # HINT: Why is this the same as N*(1-p)-I0?
+N.simu2 <- NaN*tset; N.simu2[1] <- N
+S.simu2 <- NaN*tset; S.simu2[1] <- S0
+I.simu2 <- NaN*tset; I.simu2[1] <- I0
+R.simu2 <- NaN*tset; R.simu2[1] <- N - I0 - S0 - V
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu2[i-1]
+	I <- I.simu2[i-1]
+	R <- R.simu2[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu2[i] <- S + dS
+	I.simu2[i] <- I + dI
+	R.simu2[i] <- R + dR
+	N.simu2[i] <- N + dN	
+}
+```
+
+Let's look at how individuals moved between classes. We'll designate one more colour for vaccinated individuals
+```{r}
+Vcol <- 'darkorchid3'
+plot(x = tset, y = N.simu2, type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,N*1.2))
+abline(h = 0)
+lines(x = tset, y = S.simu2, col = Scol, lwd = 2)
+lines(x = tset, y = I.simu2, col = Icol, lwd = 2)
+lines(x = tset, y = R.simu2, col = Rcol, lwd = 2)
+lines(x = tset, y = rep(V,length(tset)), col = Vcol, lwd = 2)
+legend(x = max(tset)*0.05, y = N*1.2, legend=c('N','S','I','R','V'),lwd= 2, col=c(Ncol,Scol,Icol,Rcol,Vcol), horiz=TRUE)
+```
+
+Now, let's compare the incidence graphs for the two scenarios (unvaccinated vs. 70% vaccinated)
+```{r}
+plot(x = tset, y = I.simu1, col = Icol, type='l', lwd = 2, las = 1, xlab = 'Time',ylab='Incidence')
+lines(x = tset, y = I.simu2, col = 'black', lwd = 2)
+legend(x = max(tset)*0.6, y = max(I.simu1)*.9, legend = c('Unvacc.','70% Vacc'),lwd = 2, col =c(Icol,'black'))
+```
+
+Think, Pair, Share 2:
+1. How did vaccination change the dynamics that you observed?
+```{r}
+## SOLUTION ##
+# It reduced the incidence, but also prolonged the run of the disease (e.g., there were still infectious individuals around for longer)
+## END SOLUTION ##
+```
+
+2. Did vaccination create herd immunity? In other words, were any unvaccinated individuals protected? Hint: Plot the number of susceptible individuals over time to find out.
+```{r}
+## SOLUTION ##
+plot(x = tset, y = S.simu1, col = Scol, las = 1, lwd = 2, type = 'l', xlab = 'Time', ylab = 'Number Susceptible')
+lines(x = tset, y = S.simu2, col = 'black', lwd=2)
+legend(x = max(tset)*0.6, y = max(S.simu1)*.9, legend = c('Unvacc.','70% Vacc'),lwd = 2, col =c(Scol,'black'))
+
+# or #
+S.simu2[length(tset)]
+I.simu2[length(tset)]
+
+# Yes, one (or two, if you round up) of the susceptible individuals remained uninfected by the end of the simulation. So this person was protected by herd immunity, though the other susceptibles were not. Also, this simulation hasn't run long enough for the disease to completely disappear (I --> 0), so that person could still get sick.
+## END SOLUTION ##
+```
+
+3. Add a line to your incidence graph for a higher rate of vaccination, p2, of 0.8. (Don't forget to change the legend!) How does this compare?
+```{r}
+## SOLUTION ##
+p2 <- 0.8
+V2 <- N*p2   # Number vaccinated. This won't change over time.
+S0 <- N - V2 - I0  # HINT: Why is this the same as N*(1-p)-I0?
+N.simu3 <- NaN*tset; N.simu3[1] <- N
+S.simu3 <- NaN*tset; S.simu3[1] <- S0
+I.simu3 <- NaN*tset; I.simu3[1] <- I0
+R.simu3 <- NaN*tset; R.simu3[1] <- N - I0 - S0 - V2
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu3[i-1]
+	I <- I.simu3[i-1]
+	R <- R.simu3[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu3[i] <- S + dS
+	I.simu3[i] <- I + dI
+	R.simu3[i] <- R + dR
+	N.simu3[i] <- N + dN	
+}
+
+plot(x = tset, y = I.simu1, col = Icol, type='l', lwd = 2, las = 1, xlab = 'Time',ylab='Incidence')
+lines(x = tset, y = I.simu2, col = 'black', lwd = 2)
+lines(x = tset, y = I.simu3, col = 'blue', lwd = 2)
+legend(x = max(tset)*0.6, y = max(I.simu1)*.9, legend = c('Unvacc.','70% Vacc','80% Vacc'),lwd = 2, col =c(Icol,'black','blue'))
+
+# In this case, the disease spreads even less. We can also see from
+
+S.simu3[length(tset)]
+S.simu2[length(tset)]
+R.simu3[length(tset)]
+R.simu2[length(tset)]
+I.simu3[length(tset)]
+I.simu2[length(tset)]
+# that more individuals benefitted from herd immunity, though a number still got.
+
+## END SOLUTION ##
+```
+
+# C. Calculating vaccination rates to prevent an outbreak
+Let's say you were a public health official interested in preventing this disease from having the potential to create an epidemic in your population. Your goal is to bring the basic reproduction number below 1.
+
+Recall: 
+
+R_0 = beta * S / gamma
+
+$$
+\begin{align}
+R_0 &= \frac{\beta S}{\gamma} \\ 
+\end{align}
+$$
+
+What is R0 for this disease when it first enters the population?
+```{r}
+R0 <- beta * N / gamma
+
+# Why are we using N in place of S in the above formulation?
+```
+
+Recall that:
+R_V = R_0 * (1 - p)
+$$
+\begin{align}
+R_V &= R_0 (1-p) \\ 
+\end{align}
+$$
+What level of vaccination (let's call it p_crit for "critical vaccination level") would prevent this disease from having an epidemic? HINT: Set R_V = 1
+```{r}
+p_crit <- 1 - 1/R0
+```
+
+Let's check that prediction
+```{r}
+V3 <- N*p_crit   # Number vaccinated. This won't change over time.
+S0 <- N - V3 - I0  # HINT: Why is this the same as N*(1-p)-I0?
+N.simu4 <- NaN*tset; N.simu4[1] <- N
+S.simu4 <- NaN*tset; S.simu4[1] <- S0
+I.simu4 <- NaN*tset; I.simu4[1] <- I0
+R.simu4 <- NaN*tset; R.simu4[1] <- N - I0 - S0 - V3
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu4[i-1]
+	I <- I.simu4[i-1]
+	R <- R.simu4[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu4[i] <- S + dS
+	I.simu4[i] <- I + dI
+	R.simu4[i] <- R + dR
+	N.simu4[i] <- N + dN	
+}
+
+plot(x = tset, y = N.simu4, type = 'l', col=Ncol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,N*1.2))
+abline(h = 0)
+lines(x = tset, y = S.simu4, col = Scol, lwd = 2)
+lines(x = tset, y = I.simu4, col = Icol, lwd = 2)
+lines(x = tset, y = R.simu4, col = Rcol, lwd = 2)
+lines(x = tset, y = rep(V3,length(tset)), col = Vcol, lwd = 2)
+legend(x = max(tset)*0.05, y = N*1.2, legend=c('N','S','I','R','V'),lwd= 2, col=c(Ncol,Scol,Icol,Rcol,Vcol), horiz=TRUE)
+```
+
+Let's zoom in on the susceptible, infected, & recovered to see what's going on a bit better
+```{r}
+plot(x = tset, y = S.simu4, type = 'l', col=Scol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,max(S.simu4)*1.2))
+abline(h = 0)
+lines(x = tset, y = I.simu4, col = Icol, lwd = 2)
+lines(x = tset, y = R.simu4, col = Rcol, lwd = 2)
+legend(x = max(tset)*0.1, y = max(S.simu4)*1.2, legend=c('S','I','R'),lwd= 2, col=c(Scol,Icol,Rcol), horiz=TRUE)
+```
+
+What we can see is that, while not all susceptible individuals were protected by herd immunity, the number of sick individuals declined monotonically (that is, was always declining at all times) over time. So, we prevented an outbreak!
+
+We can also see this by adding this scenario to our incidence graph
+```{r}
+plot(x = tset, y = I.simu1, col = Icol, type='l', lwd = 2, las = 1, xlab = 'Time',ylab='Incidence')
+lines(x = tset, y = I.simu2, col = 'black', lwd = 2)
+lines(x = tset, y = I.simu3, col = 'blue', lwd = 2)
+lines(x = tset, y = I.simu4, col = 'orchid', lwd = 2)
+legend(x = max(tset)*0.6, y = max(I.simu1)*.9, legend = c('Unvacc.','70% Vacc','80% Vacc','90% Vacc'),lwd = 2, col =c(Icol,'black','blue','orchid'))
+```
+
+# D. Dependence of R_0 and p_crit on disease biology
+Let's consider how R_0, and the corresponding vaccination rate that we need to prevent an outbreak, depend on one of the parameters, beta, or infectivity.
+
+First, given that 
+
+R_0 = beta * N / gamma
+
+What prediction would you make for R_0 as beta increases? For p_crit as beta increases? Do these predictions make biological sense?
+
+Let's compute:
+```{r}
+beta_set <- seq(from = 0.001, to = 0.1, length.out = 100)
+
+R0_set <- beta_set*N/gamma
+
+p_crit_set <- 1 - 1/R0_set  # HINT: Why did we avoid beta = 0 in our range of beta's above?
+```
+
+And visualize:
+```{r}
+plot(x = beta_set, y = R0_set, type = 'l', xlab = 'Infectiousness (beta)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 2)
+
+
+plot(x = beta_set, y = p_crit_set, type = 'l', xlab = 'Infectiousness (beta)', ylab = 'Critical Vaccination Rate (p_crit)', las = 1, lwd = 2)
+
+Nset <- seq(from = 0, to = 100, length.out = 100)
+R0_set.N <- beta*Nset/gamma
+plot(x = Nset, y = R0_set, type = 'l', xlab = 'Infectiousness (beta)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 2)
+
+```
+
+# PART FOUR: HOMEWORK
+```{r}
+# 1. Make a single Incidence graph (plot number of infected individuals -- class I -- over time) that overlays the following scenarios for a population of N = 100. Be sure to include a legend so that we can differentiate between them!
+###########################################################
+# 1a. With a black line: beta = 0.01, gamma = 0.1, p = 0 #
+###########################################################
+beta <- 0.01  
+gamma <- 0.1 
+N <- 100   
+I0 <- 1		
+S0 <- N - I0	
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu1 <- NaN*tset; N.simu1[1] <- N
+I.simu1 <- NaN*tset; I.simu1[1] <- I0
+S.simu1 <- NaN*tset; S.simu1[1] <- S0
+R.simu1 <- NaN*tset; R.simu1[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu1[i-1] 
+	I <- I.simu1[i-1]
+	R <- R.simu1[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu1[i] <- S + dS
+	I.simu1[i] <- I + dI
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+}
+##########################################################
+# 1b. With a blue line: beta = 0.05, gamma = 0.1, p = 0 #
+##########################################################
+beta <- 0.05  
+gamma <- 0.1 
+N <- 100  
+I0 <- 1	
+S0 <- N - I0
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu2 <- NaN*tset; N.simu2[1] <- N
+I.simu2 <- NaN*tset; I.simu2[1] <- I0
+S.simu2 <- NaN*tset; S.simu2[1] <- S0
+R.simu2 <- NaN*tset; R.simu2[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu2[i-1]  
+	I <- I.simu2[i-1]
+	R <- R.simu2[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu2[i] <- S + dS
+	I.simu2[i] <- I + dI
+	R.simu2[i] <- R + dR
+	N.simu2[i] <- N + dN
+}
+###########################################################
+# 1c. With a green line: beta = 0.01, gamma = 0.3, p = 0 #
+###########################################################
+beta <- 0.01  
+gamma <- 0.3
+N <- 100   
+I0 <- 1	
+S0 <- N - I0	
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu3 <- NaN*tset; N.simu3[1] <- N
+I.simu3 <- NaN*tset; I.simu3[1] <- I0
+S.simu3 <- NaN*tset; S.simu3[1] <- S0
+R.simu3 <- NaN*tset; R.simu3[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu3[i-1]  
+	I <- I.simu3[i-1]
+	R <- R.simu3[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR 
+	S.simu3[i] <- S + dS
+	I.simu3[i] <- I + dI
+	R.simu3[i] <- R + dR
+	N.simu3[i] <- N + dN
+}
+# Plot the three simulations
+plot(x = tset, y = I.simu1, type = 'l', las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Infected Individuals', ylim = c(0,N))
+abline(h = 0)
+lines(x = tset, y = I.simu2, col = 'blue', lwd = 2)
+lines(x = tset, y = I.simu3, col = 'green', lwd = 2)
+legend(x = max(tset)*0.45, y = N, legend=c('beta = 0.01, gamma = 0.1, p = 0','beta = 0.05, gamma = 0.1, p = 0','beta = 0.01, gamma = 0.3, p = 0'),lwd= 2, col=c('black','blue','green'), horiz=F)
+
+# /1 point black line
+# /1 point blue line
+# /1 point green line
+# /1 point legend
+# /1 point axes labels 
+# = /5 points total
+```
+
+```{r}
+# 2. Describe the differences between the scenarios you plotted above.
+#  2a. What is the effect of decreasing infectiousness? 
+# Decreasing infectiousness (black vs. blue lines) results in a lower incidence of infected individuals. Decreasing infectiousness prolongs the overall run of the disease. The overall number of infected individuals is greater in the black scenario with lower infectivity at the end of the simulation, relative to the blue simulation with higher infectivity. 
+I.simu1[length(tset)] # black simulation
+I.simu2[length(tset)] # blue simulation
+
+#  2b. What is the effect of increasing recovery rates? 
+# Increasing recovery rates (black vs. green lines) results in a lower incidence of infected individuals because individuals in the infected class are moving to the recovered classed at a faster rate (i.e., there's shorter window of opportunity to infect susceptibles). For example, there are a fewer number of infecteds at the end of the green simulation with higher recovery, relative to the black simulation with lower recovery. Interestingly, there are a higher number of recovereds at the end of the simulation for the black scenario (lower recovery) relative to the green scenario (higher recovery). This occurs because more susceptibles have the opportunity to get infected by a larger infected class in the scenario lower recovery. 
+I.simu1[length(tset)] # black simulation
+I.simu3[length(tset)] # green simulation
+R.simu1[length(tset)] # black simulation
+R.simu3[length(tset)] # green simulation
+S.simu1[length(tset)] # black simulation
+S.simu3[length(tset)] # green simulation
+
+# /2 points for the effect of decreasing infectiousness
+# /2 points for the effect of increasing infectiousness
+# = /4 points total
+```
+
+```{r}
+# 3. Calculate R_0 for each of each of the disease scenarios in Question 1, assuming an initial susceptible population size S = 100. What vaccination proportion (p) for each would be required to prevent a disease outbreak?
+S <- 100
+
+p_crit <- 1 - 1/R0
+
+beta <- 0.01  
+gamma <- 0.1 
+R0.black <- beta * S / gamma
+p_crit.black <- 1 - 1/R0.black
+p_crit.black
+
+beta <- 0.05  
+gamma <- 0.1 
+R0.blue <- beta * S / gamma
+p_crit.blue <- 1 - 1/R0.blue
+p_crit.blue
+
+beta <- 0.01  
+gamma <- 0.3
+R0.green <- beta * S / gamma
+p_crit.green <- 1 - 1/R0.green
+p_crit.green
+
+# Why are we using N in place of S in the above formulation?
+# We can assume that when a new infection comes into contact with a naïve population, that the total number of individuals in the population (N) is approximate to the number of susceptible individuals (N ~ S).
+
+# /2 points for work + answer for p.crit scenario 1
+# /2 points for work + answer for p.crit scenario 2
+# /2 points for work + answer for p.crit scenario 3
+# /1 points for N ~ S answer
+# = /7 points total
+```
+
+
+# 4. Run three simulations to check your answers for Part 3. For each, make an incidence diagram (total of 3 incidence diagrams) comparing the unvaccinated scenario (using a black line) with the vaccinated scenario (using a blue line). Don't forget to (1) label your plots so that we know which corresponds to which scenario, and (2) include a legend indicating which line corresponds to vaccinated vs. unvaccinated.
+```{r}
+############################################################
+# Unvaccinated black line: beta = 0.01, gamma = 0.1, p = 0 #
+# Vaccinated blue line: beta = 0.01, gamma = 0.1, p = 0.9  #
+############################################################
+beta <- 0.01  
+gamma <- 0.1 
+N <- 100   
+I0 <- 1		
+S0 <- N - I0	
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu1 <- NaN*tset; N.simu1[1] <- N
+I.simu1 <- NaN*tset; I.simu1[1] <- I0
+S.simu1 <- NaN*tset; S.simu1[1] <- S0
+R.simu1 <- NaN*tset; R.simu1[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu1[i-1] 
+	I <- I.simu1[i-1]
+	R <- R.simu1[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu1[i] <- S + dS
+	I.simu1[i] <- I + dI
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+}
+
+V.simu <- N*p_crit.black   
+S0 <- N - V.simu - I0 
+N.simu4 <- NaN*tset; N.simu4[1] <- N
+S.simu4 <- NaN*tset; S.simu4[1] <- S0
+I.simu4 <- NaN*tset; I.simu4[1] <- I0
+R.simu4 <- NaN*tset; R.simu4[1] <- N - I0 - S0 - V.simu
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu4[i-1]
+	I <- I.simu4[i-1]
+	R <- R.simu4[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu4[i] <- S + dS
+	I.simu4[i] <- I + dI
+	R.simu4[i] <- R + dR
+	N.simu4[i] <- N + dN	
+}
+
+plot(x = tset, y = I.simu1, type = 'l', las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Infected Individuals', ylim = c(0,N), main = "Scenario 1: beta = 0.01, gamma = 0.1, p = 0 vs. p = 0.9")
+abline(h = 0)
+lines(x = tset, y = I.simu4, col = 'blue', lwd = 2)
+legend(x = max(tset)*0.45, y = N, legend=c('Unvaccinated','Vaccinated'),lwd= 2, col=c('black','blue'), horiz=F)
+
+############################################################
+# Unvaccinated black line: beta = 0.05, gamma = 0.1, p = 0 #
+# Vaccinated blue line: beta = 0.05, gamma = 0.1, p = 0.98 #
+############################################################
+beta <- 0.05  
+gamma <- 0.1 
+N <- 100  
+I0 <- 1	
+S0 <- N - I0
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu2 <- NaN*tset; N.simu2[1] <- N
+I.simu2 <- NaN*tset; I.simu2[1] <- I0
+S.simu2 <- NaN*tset; S.simu2[1] <- S0
+R.simu2 <- NaN*tset; R.simu2[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu2[i-1]  
+	I <- I.simu2[i-1]
+	R <- R.simu2[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu2[i] <- S + dS
+	I.simu2[i] <- I + dI
+	R.simu2[i] <- R + dR
+	N.simu2[i] <- N + dN
+}
+
+V.simu <- N*p_crit.blue   
+S0 <- N - V.simu - I0 
+N.simu5 <- NaN*tset; N.simu5[1] <- N
+S.simu5 <- NaN*tset; S.simu5[1] <- S0
+I.simu5 <- NaN*tset; I.simu5[1] <- I0
+R.simu5 <- NaN*tset; R.simu5[1] <- N - I0 - S0 - V.simu
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu5[i-1]
+	I <- I.simu5[i-1]
+	R <- R.simu5[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu5[i] <- S + dS
+	I.simu5[i] <- I + dI
+	R.simu5[i] <- R + dR
+	N.simu5[i] <- N + dN	
+}
+
+plot(x = tset, y = I.simu2, type = 'l', las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Infected Individuals', ylim = c(0,N), main = "Scenario 2: beta = 0.05, gamma = 0.1, p = 0 vs. p = 0.98")
+abline(h = 0)
+lines(x = tset, y = I.simu5, col = 'blue', lwd = 2)
+legend(x = max(tset)*0.45, y = N, legend=c('Unvaccinated','Vaccinated'),lwd= 2, col=c('black','blue'), horiz=F)
+#############################################################
+# Unvaccinated black line: beta = 0.01, gamma = 0.3, p = 0  # 
+# Vaccinated green line: beta = 0.01, gamma = 0.3, p = 0.70 #
+#############################################################
+beta <- 0.01  
+gamma <- 0.3
+N <- 100   
+I0 <- 1	
+S0 <- N - I0	
+R0 <- 0 
+tset <- seq(from = 0, to = 60, length.out = 20000)
+N.simu3 <- NaN*tset; N.simu3[1] <- N
+I.simu3 <- NaN*tset; I.simu3[1] <- I0
+S.simu3 <- NaN*tset; S.simu3[1] <- S0
+R.simu3 <- NaN*tset; R.simu3[1] <- 0
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu3[i-1]  
+	I <- I.simu3[i-1]
+	R <- R.simu3[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR 
+	S.simu3[i] <- S + dS
+	I.simu3[i] <- I + dI
+	R.simu3[i] <- R + dR
+	N.simu3[i] <- N + dN
+}
+
+V.simu <- N*p_crit.green   
+S0 <- N - V.simu - I0 
+N.simu6 <- NaN*tset; N.simu6[1] <- N
+S.simu6 <- NaN*tset; S.simu6[1] <- S0
+I.simu6 <- NaN*tset; I.simu6[1] <- I0
+R.simu6 <- NaN*tset; R.simu6[1] <- N - I0 - S0 - V.simu
+
+for(i in 2:length(tset)){
+	dt <- tset[i]-tset[i-1]
+	S <- S.simu6[i-1]
+	I <- I.simu6[i-1]
+	R <- R.simu6[i-1]
+	dS <- (-beta*S*I)*dt
+	dI <- (beta*S*I-gamma*I)*dt
+	dR <- (gamma*I)*dt
+	dN <- dS+dI+dR  
+	S.simu6[i] <- S + dS
+	I.simu6[i] <- I + dI
+	R.simu6[i] <- R + dR
+	N.simu6[i] <- N + dN	
+}
+
+plot(x = tset, y = I.simu3, type = 'l', las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Infected Individuals', ylim = c(0,N), main = "Scenario 3: beta = 0.01, gamma = 0.3, p = 0 vs. p = 0.70")
+abline(h = 0)
+lines(x = tset, y = I.simu6, col = 'blue', lwd = 2)
+legend(x = max(tset)*0.45, y = N, legend=c('Unvaccinated','Vaccinated'),lwd= 2, col=c('black','blue'), horiz=F)
+
+# /3 points for unvaccinated lines
+# /3 points for vaccinated lines
+# /3 points for legend
+# /3 points for axes 
+# = /12 points total (3 plots)
+```
+
+```{r}
+# 5. Explain how R_0 and p depend upon:
+#  5a. infectiousness, 
+#  5b. recovery time, and 
+#  5c. population size (assuming N = S, when the disease has not yet arrived). 
+# For each of these (for a total of 6 plots -- don't forget to label the axes of each one!): 
+		# create a plot of R_0 (y-axis) vs. the parameter/variable of interest (x-axis),
+		# create a plot of p (y-axis) vs. the parameter of interest (x-axis), and
+		# explain the shapes of the graphs based on the biology of disease spread. Do you notice anything odd about the answer to 5c?
+
+# Given that -- 
+# R_0 = beta * N / gamma
+# p_crit_set <- 1 - 1/R0_set
+
+# 5a. As infectiousness increases, R0 increases and p_crit increases asymptotically.
+# 5b. As recovery time increases, R0 increases and p_crit increases asymptotically.
+# 5c. As population size increases, R0 increases and p_crit increases asymptotically.
+# Do you notice anything odd about the answer to 5c?: 
+# When population sizes are very small, the expected number of secondary infections caused by a single infectious individual (R0) is low. Infected individuals in very small populations have a low probability of contact to a susceptible, relative to a population with a high density (imagine a person with measles walking into a packed sports arena vs. an arena with 5 people). A low enough R0 can cause critical vaccination rate to be negative. Biologically, this suggests that at very low population sizes an outbreak is unlikely because the probability of any given infected individual coming into contact with a susceptible is very low. The threshold where vaccination should be considered to prevent an outbreak is at N > 10. 
+
+beta <- .01   # infectivity
+gamma <- 0.1  # recovery
+
+##################
+# Infectiousness #
+##################
+beta_set <- seq(from = 0.001, to = 0.1, length.out = 100) # make a set of betas to iterate over
+R0_set.beta <- beta_set*N/gamma # calculate R0 with varied betas
+p_crit_set.beta <- 1 - 1/R0_set.beta # calculate p_crit with varied R0s
+# R_0 (y-axis) vs. infectiousness (x-axis)
+plot(x = beta_set, y = R0_set.beta, type = 'l', xlab = 'Infectiousness (beta)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 2)
+# p (y-axis) vs. infectiousness (x-axis)
+plot(x = beta_set, y = p_crit_set.beta, type = 'l', xlab = 'Infectiousness (beta)', ylab = 'Critical Vaccination Rate (p_crit)', las = 1, lwd = 2)
+
+#################
+# Recovery time #
+#################
+gamma_set <- seq(from = 0.001, to = 0.1, length.out = 100) # make a set of gammas to iterate over
+R0_set.gamma <- beta*N/(1/gamma_set) # calculate R0 with varied gammas
+p_crit_set.gamma <- 1 - 1/R0_set.gamma # calculate p_crit with varied R0s
+# R_0 (y-axis) vs. recovery time (x-axis)
+plot(x = gamma_set, y = R0_set.gamma, type = 'l', xlab = 'Recovery Time (gamma)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 2)
+# p (y-axis) vs. recovery time (x-axis)
+plot(x = gamma_set, y = p_crit_set.gamma, type = 'l', xlab = 'Recovery Time (gamma)', ylab = 'Critical Vaccination Rate (p_crit)', las = 1, lwd = 2)
+
+###################
+# Population size #
+###################
+# R_0 (y-axis) vs. population size (x-axis)
+Nset <- seq(from = 0, to = 100, length.out = 100)
+R0_set.N <- beta*Nset/gamma
+p_crit_set.N <- 1 - 1/R0_set.N
+plot(x = Nset, y = R0_set.N, type = 'l', xlab = 'Population Size (N)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 2)
+# p (y-axis) vs. population size (x-axis)
+plot(x = Nset, y = p_crit_set.N, type = 'l', xlab = 'Population Size (N)', ylab = 'Critical Vaccination Rate (p_crit)', las = 1, lwd = 2)
+
+# /6 points for explanation of how R_0 and p depend upon infectiousness, recovery time, and population size.
+# /6 point per simulation line 
+# /6 point per set of axes 
+# /2 point for explanation of negative p_crit values in answer to 5c
+# = /20 points total (6 plots)
+# Note : Ok to give full credit if students used gamma instead of 1/gamma for recovery time for Winter 2020 only. Key was incorrectly made the first time and TAs disseminated that information. Next year half credit for using gamma instead of 1/gamma.
+```
+
+total = 48 points
+

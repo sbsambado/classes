@@ -1,0 +1,718 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+## LAB 6: WHAT MEDIATES COEXISTENCE?
+
+Announcements --  
+    (1) Wednesday, February 26th by 11:59pm -- Homework from this lab is due 
+    (2) Thursday, February 27th by 11:59pm -- Submit code for your model on Gauchospace (for homework points).
+
+In this lab, we will be continuing our study of competition between species.
+
+We will be using explicit models of competition. In this case, we will specifically be using models in which two competitors (N and M) share a resource (R). Thus, each species has a negative effect on the other by depleting the resource that the competitor also needs for survival.
+
+This system will follow the set of ordinary differential equations:
+```{r}
+#	dR/dt = r*R*(1-R/K) - a_N*R*N - a_M*R*M
+#	dN/dt = e*a_N*R*N - l_N*N
+#	dM/dt = e*a_M*R*M - l_M*M
+```
+
+$$
+\begin{align}
+\frac{d R}{dt}  &= r R (1-\frac{R}{K}) - a_N R N - a_M R M \\ 
+\newline
+\frac{d N}{dt} &= e a_N R N - l_N N \\
+\newline
+\frac{d M}{dt} &= e a_M R M - l_M M \\
+\end{align}
+$$
+First, we'll demonstrate that the dominant competitor in this system is the one that can draw resources down to the lowest level.
+
+Second, we'll explore two mechanisms by which species can coexist in this system: 
+One mechanism will be "bottom-up" -- niche partitioning via specialization on two different resources.
+The second mechanism will be "top-down" -- predator-mediated coexistence.
+
+# PART ONE: Competitive exclusion
+
+### 1A: Parameterizing the model
+First, let's set up the resource's parameters
+```{r}
+r <- .5		# Intrinsic growth rate of the resource
+K <- 100	# Carrying capacity of the resource
+```
+
+Second, let's set up the biological parameters for competitor N
+```{r}
+a_N <- 0.2	# Affinity or attack rate of N for/on the resource R
+e <- 0.05	# Conversion efficiency of R into N
+l_N <- 0.01	# Mortality rate of N
+```
+
+Third, let's set up competitor M to be the same as competitor N, except for having a 50% higher affinity/attack rate.
+```{r}
+a_M <- a_N*1.5
+l_M <- l_N
+```
+
+### 1B: Calculating Tilman's R* for each species 
+By setting dN/dt and dM/dt = 0, we can calculate R* for each species
+```{r}
+Rstar_N <- l_N/e/a_N
+Rstar_N
+Rstar_M <- l_M/e/a_M
+Rstar_M
+```
+
+Species M has a lower R* than species N; thus, we can predict that species M should be competitively dominant. This makes sense because species M has a higher affinity for the resource (and all other parameters are equivalent).
+
+### 1C: Checking our prediction with a simulation
+```{r}
+tset1 <- seq(from=0, to=10000, length.out = 100000)
+R.simu1 <- NaN*tset1; R.simu1[1] <- 0.5
+N.simu1 <- NaN*tset1; N.simu1[1] <- 1
+M.simu1 <- NaN*tset1; M.simu1[1] <- 1
+
+for(i in 2:length(tset1)){
+	dt <- tset1[i]-tset1[i-1]
+	R <- R.simu1[i-1]
+	N <- N.simu1[i-1]
+	M <- M.simu1[i-1]
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dN <- ( e*a_N*N*R - l_N*N )*dt
+	dM <- ( e*a_M*M*R - l_M*M )*dt
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+	M.simu1[i] <- M + dM
+}
+```
+
+Examine your results with plots. Because the y-axis scales may be different, we'll use separate plots for the resource, and the two competitors.
+```{r}
+Rcol <- 'peru'
+Ncol <- 'dodgerblue'
+Mcol <- 'seagreen3'
+
+plot(tset1,R.simu1,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol)
+
+plot(tset1,M.simu1,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu1,N.simu1)))))
+lines(tset1,N.simu1,lwd=2,col=Ncol)
+legend(x=8000,y=1,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+```
+
+
+Check to see if your prediction was correct. The 'tail' function can also help you check whether you've reached equilibrium. 
+```{r}
+tail(R.simu1)
+Rstar_M
+```
+
+
+### 1D: THINK, PAIR, SHARE 1: 
+
+Alter the parameters such that N and M differ ONLY in mortality rates (a_N = a_M, but l_N is different from l_M). 
+```{r}
+r <- .5		# Intrinsic growth rate of the resource
+K <- 100	# Carrying capacity of the resource
+a_N <- 0.2	# Affinity or attack rate of N for/on the resource R
+e <- 0.05	# Conversion efficiency of R into N
+l_N <- 0.01	# Mortality rate of N
+a_M <- a_N # Attack or affinity rate of M for/on the resource R
+l_M <- 0.02 # Mortality rate of M
+```
+
+1. Based on your parameter choices, which species do you expect to win?
+```{r}
+# I would predict N to 'win'. 
+```
+
+2. Calculate R* for each species
+```{r}
+Rstar_N <- l_N/e/a_N
+Rstar_N
+Rstar_M <- l_M/e/a_M
+Rstar_M
+```
+
+3. Check your prediction with a simulation
+```{r}
+tset1 <- seq(from=0, to=10000, length.out = 100000)
+R.simu2 <- NaN*tset1; R.simu2[1] <- 0.5
+N.simu2 <- NaN*tset1; N.simu2[1] <- 1
+M.simu2 <- NaN*tset1; M.simu2[1] <- 1
+
+for(i in 2:length(tset1)){
+	dt <- tset1[i]-tset1[i-1]
+	R <- R.simu2[i-1]
+	N <- N.simu2[i-1]
+	M <- M.simu2[i-1]
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dN <- ( e*a_N*N*R - l_N*N )*dt
+	dM <- ( e*a_M*M*R - l_M*M )*dt
+	R.simu2[i] <- R + dR
+	N.simu2[i] <- N + dN
+	M.simu2[i] <- M + dM
+}
+
+Rcol <- 'peru'
+Ncol <- 'dodgerblue'
+Mcol <- 'seagreen3'
+
+plot(tset1,R.simu2,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol)
+
+plot(tset1,M.simu2,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu2,N.simu2)))))
+lines(tset1,N.simu2,lwd=2,col=Ncol)
+legend(x=8000,y=1,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+
+tail(R.simu2)
+Rstar_N
+Rstar_M
+```
+
+# PART TWO: Coexistence via niche partitioning
+
+One way that ecologists think species may coexist is by utilizing different resources. In an extreme case, two species could specialize and not compete at all (e.g., if Species N uses only resource R, and Species M uses only resource S). However, even when both species use both resources, coexistence is possible if each species prefers (and therefore is limited by) a different resource. 
+
+This is conceptually a parallel idea to the Lotka-Volterra conclusion that coexistence occurs when intraspecific competition is stronger than interspecific competition. In this case, in which we explicitly account for resources, each species is limited by a different resource, and so intraspecific competition (with conspecifics, for the limiting resource) is stronger than interspecific competition (with the other species, for the non-limiting resource).
+
+### 2A: Developing a two-resource model for a single consumer
+
+When a species requires more than one resource to grow, we have to think carefully about how to formulate its growth rate. In this case, let's imagine that the two resources are "interchangeable" -- that is, the the competitors could survive on either one or the other (e.g., two prey items for a predator, as opposed to two "essential" resources like food and water). 
+
+Let's imagine that species N can use two resources, R and S, to grow. It takes up R at a rate a_N, and takes up S at a rate b_N. We can write:
+```{r}
+# dN/dt = e*N*(a_N*R + b_N*S) - l_N*N
+
+# Neglecting species M for the moment, and assuming that the two resources have identical replenishment (intrinsic growth) rates and carrying capacities, we have:
+
+# dR/dt = r*R*(1-R/K) - a_N*R*N
+# dS/dt = r*S*(1-S/K) - b_N*S*N
+# dN/dt = e*N*(a_N*R + b_N*S) - l_N*N
+```
+
+$$
+\begin{align}
+\frac{d R}{dt}  &= r R (1-\frac{R}{K}) - a_N R N \\ 
+\newline
+\frac{d S}{dt} &= r S (1-\frac{S}{K}) - b_N S N \\
+\newline
+\frac{d N}{dt} &= e N (a_N R + b_N S) - l_N N\\
+\end{align}
+$$
+
+
+
+### 2B: Parameterizing, predicting, and simulating
+
+Resource parameters
+```{r}
+r <- .5		# Intrinsic growth rate of the resources
+K <- 100	# Carrying capacity of the resources
+```
+
+N's biological parameters, assuming N prefers resource S
+```{r}
+a_N <- 0.01	# Affinity or attack rate of N for/on the resource R
+b_N <- 0.2	# Affinity or attack rate of N for/on the resource S
+e <- 0.05	# Conversion efficiency of resources into N
+l_N <- 0.01	# Mortality rate of N
+```
+
+We can now calculate an R* and an S*
+```{r}
+Rstar_N <- l_N/e/a_N
+Sstar_N <- l_N/e/b_N
+Rstar_N
+Sstar_N
+```
+
+THINK, PAIR, SHARE: What do you predict the equilibrium values of R and S will be?
+
+R* = 20
+S* = 1
+
+And, now we can simulate:
+```{r}
+tset3 <- seq(from=0, to=10000, length.out = 100005)
+R.simu3 <- NaN*tset3; R.simu3[1] <- 40
+S.simu3 <- NaN*tset3; S.simu3[1] <- 40
+N.simu3 <- NaN*tset3; N.simu3[1] <- 1
+
+for(i in 2:length(tset3)){
+	dt <- tset3[i]-tset3[i-1]
+	R <- R.simu3[i-1]
+	S <- S.simu3[i-1]
+	N <- N.simu3[i-1]
+	
+	dR <- ( r*R*(1-R/K) - a_N*R*N )*dt
+	dS <- ( r*S*(1-S/K) - b_N*S*N )*dt
+	dN <- ( e*N*(a_N*R+b_N*S) - l_N*N )*dt
+	
+	R.simu3[i] <- R + dR
+	S.simu3[i] <- S + dS
+	N.simu3[i] <- N + dN	
+}
+
+# To examine the results:
+Rcol <- 'peru'
+Scol <- 'peachpuff4' #which by the way is really different from the other 'peachpuff's
+Ncol <- 'dodgerblue'
+
+plot(tset3,R.simu3,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol,ylim=c(0,K))
+lines(tset3,S.simu3,lwd=2,col=Scol)
+legend(x=8000,y=K/2,legend=c('R','S'),lwd=2,col=c(Rcol,Scol))
+
+plot(tset3,N.simu3,type='l',las=1,lwd=2,ylab='Population Size of N',xlab='Time',col=Ncol)
+```
+
+# Check to see which resource was limiting (and that you're at an equilibrium). 
+```{r}
+tail(R.simu3)
+Rstar_N
+
+tail(S.simu3)
+Sstar_N
+```
+
+
+THINK, PAIR, SHARE: 
+
+1. Do these equilibria make sense? Explain your findings from an ecological perspective.
+
+  Yes. Species N prefers (and is limited by) resource S and has a lower S_star for resource S. However, because Species N can interchangeably utilize Resource S and R, Species N can further exploit Resource S past it's S_star value of 1 because of the presence of the alternate Resource R. 
+
+2. Describe the interaction between resources S and R. Is there an ecological term you would use to describe this?
+
+  Species N drives Resource S down past S* because of the presence of resource R. Apparent competition describes the indirect effect of Resource R on Resource S. 
+
+### 2C: Introducing competitor M.
+
+As before, let's imagine that M has the greater affinity for resource R.
+```{r}
+a_M <- a_N*50
+l_M <- l_N
+```
+
+THINK, PAIR, SHARE: 
+1. In order for coexistence to be possible, do you predict that M must have a *higher* or *lower* affinity for the second resource, S?
+--Lower
+
+
+Let's set
+```{r}
+b_M <- b_N*0.02	# Affinity or attack rate of M for/on the resource S
+```
+
+Let's check affinity parameters among our competitors 
+```{r}
+a_N
+a_M
+b_N
+b_M
+```
+
+### 2D. Calculate R* and S* for each species
+```{r}
+### solution ###
+Rstar_N <- l_N/e/a_N
+Rstar_M <- l_M/e/a_M
+Rstar_N 
+Rstar_M
+
+Sstar_N <- l_N/e/b_N
+Sstar_M <- l_M/e/b_M
+Sstar_N
+Sstar_M  
+```
+
+### 2E: Checking for coexistence using simulation
+```{r}
+tset5 <- seq(from=0, to=10000, length.out = 100010)
+R.simu5 <- NaN*tset5; R.simu5[1] <- 20
+S.simu5 <- NaN*tset5; S.simu5[1] <- 20
+N.simu5 <- NaN*tset5; N.simu5[1] <- 1
+M.simu5 <- NaN*tset5; M.simu5[1] <- 1
+
+for(i in 2:length(tset5)){
+	dt <- tset5[i]-tset5[i-1]
+	R <- R.simu5[i-1]
+	S <- S.simu5[i-1]
+	N <- N.simu5[i-1]
+	M <- M.simu5[i-1]
+	
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dS <- ( r*S*(1-S/K) - b_N*N*S - b_M*M*S )*dt
+	dN <- ( e*N*(a_N*R+b_N*S) - l_N*N )*dt
+	dM <- ( e*M*(a_M*R+b_M*S) - l_M*M )*dt
+	
+	R.simu5[i] <- R + dR
+	S.simu5[i] <- S + dS
+	N.simu5[i] <- N + dN	
+	M.simu5[i] <- M + dM
+}
+
+
+plot(tset5,R.simu5,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol,ylim=c(0,K/4))
+lines(tset5,S.simu5,lwd=2,col=Scol)
+legend(x=8000,y=K/5,legend=c('R','S'),lwd=2,col=c(Rcol,Scol))
+
+Mcol <- 'seagreen3'
+plot(tset5,M.simu5,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu5,N.simu5)))))
+lines(tset5,N.simu5,lwd=2,col=Ncol)
+legend(x=8000,y=4,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+```
+
+
+# THINK, PAIR, SHARE:
+1. Use the 'tail' function to compare the equilibrium resource levels to the R* and S* values for each competitor. 
+```{r}
+tail(R.simu5)
+Rstar_N
+Rstar_M 
+
+tail(S.simu5)
+Sstar_N
+Sstar_M 
+```
+
+2. How would you interpret these results biologically?
+
+  Consumer N prefers (and is therefore limited) by resource S and has a lower R_star for resource S. Consumer N depeletes Resource S to its R* of 1 and competitively excludes Consumer M on Resource R. 
+
+  Consumer M prefers (and is therefore limited) by resource R and has a lower R_star for resource R. Consumer M depeletes Resource R to its R* of 0.4 and competitively excludes Consumer N on resource R. 
+
+3. Run an additional simulation in which only species M is present. (You can do this in two ways: by using code from Part 2B and replacing species N with species M, or by using code from Part 2E and setting the initial population size of N to 0.)
+```{r}
+tset5 <- seq(from=0, to=10000, length.out = 100010)
+R.simu6 <- NaN*tset5; R.simu6[1] <- 20
+S.simu6 <- NaN*tset5; S.simu6[1] <- 20
+N.simu6 <- NaN*tset5; N.simu6[1] <- 0
+M.simu6 <- NaN*tset5; M.simu6[1] <- 1
+
+for(i in 2:length(tset5)){
+	dt <- tset5[i]-tset5[i-1]
+	R <- R.simu6[i-1]
+	S <- S.simu6[i-1]
+	N <- N.simu6[i-1]
+	M <- M.simu6[i-1]
+	
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dS <- ( r*S*(1-S/K) - b_N*N*S - b_M*M*S )*dt
+	dN <- ( e*N*(a_N*R+b_N*S) - l_N*N )*dt
+	dM <- ( e*M*(a_M*R+b_M*S) - l_M*M )*dt
+	
+	R.simu6[i] <- R + dR
+	S.simu6[i] <- S + dS
+	N.simu6[i] <- N + dN	
+	M.simu6[i] <- M + dM
+}
+
+
+plot(tset5,R.simu6,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol,ylim=c(0,max(S.simu6)))
+lines(tset5,S.simu6,lwd=2,col=Scol)
+legend(x=8000,y=K/5,legend=c('R','S'),lwd=2,col=c(Rcol,Scol))
+
+Mcol <- 'seagreen3'
+plot(tset5,M.simu6,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu6,N.simu6)))))
+lines(tset5,N.simu6,lwd=2,col=Ncol)
+legend(x=8000,y=20,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+
+tail(R.simu6)
+Rstar_M
+tail(S.simu6)
+Sstar_M
+```
+4. Compare your N-only, M-only, and two-competitor simulations. For which do you observe the highest equilibrium population sizes of each competitor? The highest resource levels?
+```{r}
+# Plot Resource R
+plot(tset3,R.simu3,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col='red',ylim=c(0,5)) # N only
+lines(tset5,R.simu5,type='l',las=1,lwd=2,col='orange') # N and M
+lines(tset5,R.simu6,type='l',las=1,lwd=2,col='yellow') # M only
+legend(x=7000,y=60,legend=c('R: N only','R: N & M', 'R: M only'),lwd=2,col=c('red','orange','yellow'))
+
+# Plot Resource S
+plot(tset3,S.simu3,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col='green',ylim=c(0,80)) # N only
+lines(tset5,S.simu5,type='l',las=1,lwd=2,col='blue') # N and M
+lines(tset5,S.simu6,type='l',las=1,lwd=2,col='purple') # M only
+legend(x=7000,y=40,legend=c('S: N only','S: N & M', 'S: M only'),lwd=2,col=c('green','blue','purple'))
+
+# Plot Population sizes
+plot(tset3,N.simu3,type='l',las=1,lwd=2,ylab='Population Size of N',xlab='Time',col=Ncol, ylim = c(0,80)) # N only
+lines(tset5,N.simu5,lwd=2,col='darkblue') # N and M
+lines(tset5, M.simu5,lwd=2,col='darkgreen') # N and M
+lines(tset5,M.simu6,lwd=2,col=Mcol) # M only
+legend(x=7000,y=35,legend=c('N only','N: coexistence', 'M: coexistence', 'M only'),lwd=2,col=c(Ncol,'darkblue','darkgreen',Mcol))
+```
+
+# PART THREE: Predator-mediated coexistence
+
+# 3A: Modeling a 'top predator'
+
+Coexistence may also be mediated by top-down mechanisms, such as when the competitors share a common predator.
+
+We can write ODEs that describe such a system. We'll use the variable 'P' to represent the predator, who has attack rates g_N and g_M on species N and M, respectively. The predator will have its own conversion efficiency, 'c,' and it's own mortality, 'd_P':
+
+```{r}
+#dR/dt = r*R*(1-R/K) - a_N*R*N - a_M*R*M
+#dN/dt = e*a_N*R*N - l_N*N - g_N*N*P
+#dM/dt = e*a_M*R*M - l_M*M - g_M*M*P
+#dP/dt = c*P*(g_N*N+g_M*M) - d_P*P
+```
+
+$$
+\begin{align}
+Resource R: 
+\frac{d R}{dt}  &= r R (1-\frac{R}{K}) - a_N R N - a_M R M \\ 
+\newline
+Prey N: 
+\frac{d N}{dt} &= e a_N R N - l_N N - g_N N P \\
+\newline
+Prey M:
+\frac{d M}{dt} &= e a_M R M - l_M M - g_M M P \\
+\newline
+Predator: 
+\frac{d P}{dt} &= c P (g_N N+g_M M) - d_P P \\
+\end{align}
+$$
+
+Resource Parameters
+```{r}
+r <- .5		# Intrinsic growth rate of the resource
+K <- 100	# Carrying capacity of the resource
+```
+
+Competitor Parameters
+```{r}
+a_N <- 0.2	# Affinity or attack rate of N for/on the resource R
+a_M <- a_N*1.5	# Affinity or attack rate of M for/on resource R
+e <- 0.05	# Conversion efficiency of R into N and M
+l_N <- 0.01	# Mortality rate of N
+l_M <- l_N	# Mortality rate of M
+```
+
+Recall: In our simulation in Part 1, M was the dominant competitor.
+```{r}
+Rstar_N <- l_N/e/a_N
+Rstar_N
+Rstar_M <- l_M/e/a_M
+Rstar_M
+
+plot(tset1,M.simu1,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu1,N.simu1)))))
+lines(tset1,N.simu1,lwd=2,col=Ncol)
+legend(x=8000,y=1,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+```
+
+THINK, PAIR, SHARE:
+1. Make a hypothesis about the strength of predation on species N vs. species M that would allow for coexistence of M and N.
+
+  Higher predation rates on the better competitor (species M) will allow for coexistence. 
+
+2. Come up with a real-world example of such a predator. (Hint: Think about 'keystone species.')
+
+  Elk, Deer, Wolves (and many more!)
+
+3. How do you expect the presence of a predator to affect the availability of the resource, R? (Hint: Think about 'trophic cascades.')
+
+  Resource R must be above the R* for the worse competitor (even if transiently) to allow for coexistence. 
+
+### 3B: Simulating Predation
+
+Let's choose
+```{r}
+c <- 0.05		# Predator's conversion efficiency
+d_P <- 0.001	# Predator's mortality
+g_N <- 0.005	# Predation rate on competitor N
+g_M <- 0.015	# Predation rate on competitor M
+```
+
+THINK, PAIR, SHARE:
+1. Modify the following code (which comes from Part 1C, above) to allow for predation. HINT: Remember to modify dN and dM, as well as putting in a new equation for dP.
+
+```{r}
+tset7 <- seq(from=0, to=10000, length.out = 100020)
+R.simu7 <- NaN*tset7; R.simu7[1] <- 0.5
+N.simu7 <- NaN*tset7; N.simu7[1] <- 1
+M.simu7 <- NaN*tset7; M.simu7[1] <- 1
+
+for(i in 2:length(tset7)){
+	dt <- tset7[i]-tset7[i-1]
+	R <- R.simu7[i-1]
+	N <- N.simu7[i-1]
+	M <- M.simu7[i-1]
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dN <- ( e*a_N*N*R - l_N*N )*dt
+	dM <- ( e*a_M*M*R - l_M*M )*dt
+	R.simu7[i] <- R + dR
+	N.simu7[i] <- N + dN
+	M.simu7[i] <- M + dM
+}
+```
+
+```{r}
+### solution ###
+
+tset7 <- seq(from=0, to=300000, length.out = 1000020)
+R.simu7 <- NaN*tset7; R.simu7[1] <- 0.5
+N.simu7 <- NaN*tset7; N.simu7[1] <- 1
+M.simu7 <- NaN*tset7; M.simu7[1] <- 1
+P.simu7 <- NaN*tset7; P.simu7[1] <- 1
+
+for(i in 2:length(tset7)){
+	dt <- tset7[i]-tset7[i-1]
+	R <- R.simu7[i-1]
+	N <- N.simu7[i-1]
+	M <- M.simu7[i-1]
+	P <- P.simu7[i-1]
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dN <- ( e*a_N*N*R - l_N*N - g_N*N*P )*dt
+	dM <- ( e*a_M*M*R - l_M*M - g_M*M*P )*dt
+	dP <- ( c*P*(g_N*N+g_M*M) - d_P*P )*dt
+	R.simu7[i] <- R + dR
+	N.simu7[i] <- N + dN
+	M.simu7[i] <- M + dM
+	P.simu7[i] <- P + dP
+}
+
+tail(M.simu7)
+tail(N.simu7)
+tail(P.simu7)
+
+### end solution ###
+```
+
+2. Modify the following code to plot your results. HINT: You'll need to make a third plot to show the predator's dynamics
+```{r}
+Rcol <- 'peru'
+Ncol <- 'dodgerblue'
+Mcol <- 'seagreen3'
+Pcol <- 'coral'
+
+plot(tset1,R.simu1,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol)
+
+plot(tset1,M.simu1,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(c(max(M.simu1,N.simu1)))))
+lines(tset1,N.simu1,lwd=2,col=Ncol)
+legend(x=8000,y=1,legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+```
+
+```{r}
+### solution ###
+
+plot(tset7,R.simu7,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol)
+
+plot(tset7,M.simu7,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,ylim=c(0,max(max(M.simu7),max(N.simu7))))
+lines(tset7,N.simu7,lwd=2,col=Ncol)
+legend(x=max(tset7)*.8,y=max(max(M.simu7),max(N.simu7)),legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+
+plot(tset7,P.simu7,type='l',las=1,lwd=2,ylab='Predator Abundance',xlab='Time',col=Pcol)
+
+plot(tset7,M.simu7,type='l',las=1,lwd=2,ylab='Population Size',xlab='Time',col=Mcol,xlim = c(0,10000),ylim=c(0,max(max(M.simu7),max(N.simu7))))
+lines(tset7,N.simu7,lwd=2,col=Ncol)
+lines(tset7,P.simu7,las=1,lwd=2,col=Pcol)
+legend(x=max(tset7)*.8,y=max(max(M.simu7),max(N.simu7)),legend=c('N','M'),lwd=2,col=c(Ncol,Mcol))
+
+# Students should discover that they need to lengthen their time simulation # 
+
+### end solution ###
+```
+
+3. Will coexistence occur? (HINT: Look at your plots, because you are probably observing some cycling.)
+
+
+
+4. Were your predictions (about coexistence and changes to resource availability) correct? Why or why not?
+```{r}
+
+
+### partial solution ###
+tset1 <- seq(from=0, to=300000, length.out = 1000000)
+R.simu1 <- NaN*tset1; R.simu1[1] <- 0.5
+N.simu1 <- NaN*tset1; N.simu1[1] <- 1
+M.simu1 <- NaN*tset1; M.simu1[1] <- 1
+
+for(i in 2:length(tset1)){
+	dt <- tset1[i]-tset1[i-1]
+	R <- R.simu1[i-1]
+	N <- N.simu1[i-1]
+	M <- M.simu1[i-1]
+	dR <- ( r*R*(1-R/K) - a_N*N*R - a_M*M*R )*dt
+	dN <- ( e*a_N*N*R - l_N*N )*dt
+	dM <- ( e*a_M*M*R - l_M*M )*dt
+	R.simu1[i] <- R + dR
+	N.simu1[i] <- N + dN
+	M.simu1[i] <- M + dM
+}
+
+plot(tset7,R.simu7,type='l',las=1,lwd=2,ylab='Resource',xlab='Time',col=Rcol)
+lines(tset1,R.simu1,col='black',lwd=2)
+legend(x=max(tset7)*.7,y=max(R.simu7),legend=c('w/ Predator','w/o Predator'),lwd=2,col=c(Rcol,'black'))
+abline(h=Rstar_M,col='black',lty=2)
+
+### end solution ###
+```
+
+# PART FOUR: Homework
+
+Using the model from Part One (two competitors, one resource):
+1. Alter the parameters such that a_N > a_M, and l_N > l_M. List your parameters here.
+= /2 points total
+```{r}
+
+```
+
+2. Calculate R* for both species N and species M.
+= /2 points total
+```{r}
+
+```
+
+3. Based on your calculation, predict which species should "win" competition.
+= /1 point total
+```{r}
+
+```
+
+4. Run a simulation and make a timeseries plot to confirm your prediction.
+/2 points for two sets of axes
+/3 points for each line (R, N, M)
+/1 point for legend
+/2 points for code
+= /8 points total
+```{r}
+
+```
+
+
+5. Try some different initial conditions. Do you believe that the system has only one stable equilibrium?
+/2 points for a simulation with different initial conditions
+/2 points for either a plot or tail values to find stable equilibria
+/1 point for answer
+/2 points for code
+= /7 points total
+```{r}
+
+```
+
+6. Make three bifurcation diagrams showing the stable equilibria for R, N, and M as a function of K (the carrying capacity of the shared resource).
+/3 points for two or three sets of axes
+/3 points for each line (R, N, M)
+/3 points for code
+= /9 points
+```{r}
+
+```
+
+7. Describe your bifurcation diagrams from Question 6 in words. What is the ecological interpretation of your findings?
+= /4 points total
+```{r}
+
+```
+
+8. If there were a predator in your system, which prey item would it have to prefer in order for the two species to coexist?
+= /1 point total
+```{r}
+
+```
+
+= /34 points total

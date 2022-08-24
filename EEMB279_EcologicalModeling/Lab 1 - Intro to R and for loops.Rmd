@@ -1,0 +1,752 @@
+---
+title: 'EEMB 179 -- Lab 1: Introduction to R'
+output:
+  html_notebook: default
+  word_document: default
+date: "January 9, 2020"
+---
+
+
+### Class Announcements
+
+##### Welcome to Ecological Modeling!  
+
+The purpose of this lab is to give you hands-on experience exploring ecological models in the **R** language and environment. For many of you, this is your first time coding (which is very exciting!) and today's lab functions to familiarize yourself with **R**.  
+
+**Think, pair and share** -- Throughout each lab, there will be in-class 'think, pair and share' exercises where you will be given coding challenges and asked to work through answers with your fellow classmates. These exercises not only function to test your knowledge but also evaluate how well we have communicated the information to you. We understand learning how to write and implement code can be challenging but making mistakes (sometimes many) is part of the learning process. We hope each of you will help us create a safe and open space for collaboration and discussion. 
+
+**Lab assignments** -- Homework questions can be found at the end of the lab document and should be submitted through Gauchospace by Wednesday at 11:59 pm before the next lab. Please copy and paste any relevant code and output (including graphs) into a Microsoft Word document and submit the final document through Gauchospace.You are welcome to 'Knit' the document before submission, though that process can be tricky sometimes. Submissions after the due date will not be accepted unless a previous accommodation has been organized with a course instructor. 
+
+**Final project** -- You and your partners will give a 10 minute 'chalk talk' in lab during Week 10 about a research paper you have chosen (10% of your total grade). You will write up a  written report that will be due during finals week (15% of your total grade; consult the syllabus for a more detailed description). Much of the code in this lab will be provided for you, but you will be required to write your own code for your final project. Being curious and asking questions is the best way to transition from knowing what something does in concept to being able to independently write code. 
+
+\newline
+
+* Note : To access the scientific journals for your final project, you must use the campus wifi or a VPN (Virtual Private Network; if you are not on campus). More information regarding downloading can be found [here](https://www.ets.ucsb.edu/services/campus-vpn). 
+
+**Avoiding Plagiarism While Coding** --
+Our goal in this course is to teach you to be “practical coders,” able to problem-solve with the aid of your own knowledge as well as online resources, your classmates, and your TAs. This means that throughout the course, especially in the first weeks of class when we are teaching you the fundamentals of programming, you will see many examples and situations in which we demonstrate and/or encourage you to “copy/paste” portions of code that you will then modify for a task or assignment. Indeed, many of us modify code posted on help forums on the internet, and old snippets of our own code, in our daily scientific lives. 
+	The difference between this and plagiarism is that you are modifying the code for your own purposes. In other words, you will not be using any copy/paste sections of code “verbatim” because they will need to be modified to include the variable names, text notations, etc., appropriate for the task you are completing. At the end of the day, our goal is for you to learn to be confident coders. Thus, we ask that you work with one another, but don’t copy one another. Coding with friends is fun! Just make sure that you’re working side-by-side on separate computers, writing narrative responses in your own words, and learning the material for yourself.
+        
+\newline
+
+##### Important checkpoints
+    
+* **Week 4 (Friday, January 31 by 11:59 PM)**: Identify your partner for your final project.
+
+* **Week 5 (Wednesday, February 5 by 11:59 PM)**: Paper selection due (first choice and alternate). Record your paper choices on a class-shared google sheet. 
+
+* **Week 5 (Wednesday, Februrary 6)**: Meet (by appointment) to discuss paper choice with An, Austen or Prof. Moeller
+
+* **Week 6 (Thursday, February 13)**: Chalk talk demo given in lab
+
+* **Week 8 (Friday, February 28 by 11:59 PM)**: Model extensions proposed (honor section and graduate students only). 
+
+* **Week 9 (Thursday, March 5)**: Free lab period to work on project. 
+
+* **Week 10 (Thursday, March 12)**: Oral presentations of your final project in lab.
+
+* **Finals Week (Thursday, March 19 by 11:59 PM)**: Written papers due (submit via GauchoSpace). 
+    
+\newline
+
+##### TA Contact Information
+
+Austen Apigo
+    
+* Office hours: Wednesdays 10:00 am - 10:50 am in [Noble Hall 1111](https://tinyurl.com/y9f7m3re) (or by appointment)
+    
+* Email: aapigo@ucsb.edu
+
+An Bui
+
+* Office hours: Thursdays 12:30 pm - 1:30 pm, UCen tables facing the lagoon, or by appointment (or by appointment)
+    
+* Email: an_bui@ucsb.edu
+
+    + Have a question about coding? You may find it easier to work through coding issues in-person (we think so too!) and we encourage you to come to office hours, form study groups with your peers and make an appointments to see us if neccessary. If you do have a question to send by email: please remember to send us -- (1) all relevant code (including the packages that need to be loaded), (2) output or error messages and (3) any attempts you have made to solve this issue.  
+
+***
+
+### Learning Objectives 
+
+1. Become familiar with the **R** language and computing environment.
+
+\newline
+
+2. Understand the basic structure and execution of R code -- learn the difference between functions, arguments and variable assignment. 
+
+\newline
+
+3. Learn how to generate, categorize and manipulate data with **functions**. 
+
+\newline
+
+4. Become familiar with the structure of the `for()` loop and why it is used. 
+
+***
+
+### 1. Download R and Rstudio  
+
+* Why do we need R and Rstudio?
+
+    + R is the actual platform that will allows us to generate/save code, execute it and visualize graphics, while R studio is a more user-friendly platform to perform the same tasks. You can choose to work in either environment, but we'll be working exclusively in R studio for this lab. 
+
+#### A. Download the .html and .Rmd files from Gauchospace to your desktop 
+
+* What's the difference? 
+
+    + Both file types ultimately contain the same information - they contain the code we need to run and text that describes the code. However, the .Rmd file will contain extra code which formats the final .html document. You will certainly need the .Rmd file open (this is the code we will be running in class), but you may find it easier to read the .html when reviewing subject matter. I find it helpful to have both open, but it's up to you!
+    
+    + If you decide to work in the standard R environment (i.e., NOT R studio) or wish to use standard R script, your file name will be a .R file, instead of a .Rmd file. R scripts (.R files) have been traditionally (and are still heavily) used in the R environment, but have less functionality as it relates to data visualization, code organization and output generation. We have chosen to use the R notebook format (.Rmd file; also called R markdowns) for these reasons. 
+
+#### B. [Download R here](https://cran.r-project.org/mirrors.html)  
+
+* Click the link and scroll down and choose the UC Berkeley CRAN (Comprehensive R Archive Network) mirror. Mirrors contain the same host packages, but different servers are housed in different locations (think of a distribution center that delivers the same types of groceries to your local store). You can technically choose any mirror you'd like, however it's suggested you always use the closest server to your location.  
+
+* Click the appropriate link depending on your operating system (Mac OS X _vs._ Windows _vs._ Linux)
+
+    + If you're a Mac user, select R-3.6.2.pkg link for the lastest version of R "Dark and Stormy Night". 
+    
+    + If you're a PC user, click the "install R for the first time" link then "Download R 3.5.2 for Windows" link.
+
+\newline
+
+* Open your downloaded packages, agree to the license and continue downloading as usual. Find the R icon (blue R with a grey circle) in your application folder to confirm a successful download. 
+
+* If you already have R downloaded on your computer with an older version, the new version should automatically replace your older version. 
+
+* Let's open up R. 
+
+#### C. [Download R studio here](https://www.rstudio.com/products/rstudio/download/)
+
+* Click the link and select the left-most download button with under the "RStudio Desktop Open Source License" label. 
+
+* Click the appropriate installer tab depending on your operating system (usually either of the first two installers).
+
+* Open the installer, agree to the license and install normally. 
+
+* Find the R studio icon (white R in a blue circle; this is different from the previous 'R' icon) in your applications folder to confirm a successful download. 
+
+* Let's open up R studio. 
+
+***
+
+### 2. Introduction to the R Environment
+
+#### A. What is R and why are we using it? 
+
+R is an open-source programming language and environment with an extensive library of free and modifiable packages for data generation, data manipulation, statistical computing and graphical output. The R platform allows users to create external packages that are publicly availabe to perform a variety of computational tasks. The open-source (and well-documented) nature of the R platform has attracted an extensive user base of scientists. We have chosen to use R because it is heavily used in the life sciences across a diverse array of disciplines (e.g., environmental science, quantitative biology, phylogenetics, ecology etc.). 
+
+#### B. R Studio
+
+* R studio is organized into four 'panes' (locations refer to default locations, you can change these in 'Preferences'):
+
+    + **Source pane** (top left) - The source pane is where we will write and, most importantly, how we save our code. Code in the source pane must be executed to run (it will not do so automatically). The input and output will be populated in the console pane. We will cover the various options of the source pane when we actually start writing and running code below. 
+    
+        + You may find it useful to press the document outline button (top right corner) to easily switch between sections of the R notebook. 
+        
+    + **Console pane** (bottom left) - The console pane is where your code is actually executed. You can execute your code in either the Source or the Console pane. Code written directly into the Console pane is NOT saved! It is OK to excute code directly in this pane, as long as you know you don't need to save it. You'll see various tabs for the 'Console', 'Terminal' (Unix Shell) and 'Rmarkdown' (publishing output), but you will exclusively use the 'Console' tab. 
+    
+    + **Environment pane** (top right) - the environment pane tell us what files we have to work with and information about the files we have generated or imported. We can either import files from our local hard drive (e.g., an excel worksheet) or create data and store it locally in our R environment. Once files are in your Environment pane, you can click them to view or preview the data within them. 
+    
+    + **File, Plots, Packages, Help, Viewer pane** (bottom right) - The 'file' tab tells you what files you have available to call from your working directory. Your working directory is the space on your computer where R can look for files to import and where files will be held once exported from the R environment. The 'plots' tab is where plots can be previewed and exported. The 'packages' shows you which packages (units of code that do specialized functions) are in your R environment. The 'help' tab is where you can find documentation for functions. 
+    + You can change the order and presence of these four panes in the preferences tab. You can change the size of them manually by clicking and dragging.  
+
+#### C. Where to execute code
+
+* We can excute script in either the Source (top left) or the Console (bottom left) pane, but we will primarily write and execute code in the Source pane because we can (1) save our code, (2) choose which lines of code we want to run and (3) easily edit our code. 
+    
+* To execute a line of code in the Source pane you should first make a code 'chunk'. Think of this as place to say 'THIS IS CODE'. Anything outside of the 'chunk' is not treated as code and is plain text (i.e., all text up to this point).
+    
+* We can manually create a chunk by typing three grave accents followed by a bracketed r, pressing [enter], then typing three more grave accents (see below). You'll notice a grey box appears with demarcating your chunk. Your code will go between the grave accents. 
+    
+* Alternatively, we can insert a chunk by pressing the 'Insert' button, then 'R' in the Source pane. The chunk will appear wherever your cursor is located. 
+```{r}
+```
+* Let's type up some code within the chunk.
+```{r}
+1 + 1
+2 + 2
+```     
+
+#### D. How to execute code
+
+* We can tell R to execute code in a variety of ways --
+  
+    + Within the chunk, you can press the 'Play' button. 
+        
+    + Keyboard shortcut: Shift+Cmd+Enter (for mac) executes everything in the chunk.
+        
+    + Keyboard shortcut: Cmd+Enter executes the line your cursor is located on or the line(s) you have highlighted.
+        
+* You'll notice a green bar appear next to the lines of code you have executed. A red bar will appear if there is an error in a given line of code. 
+        
+* Our code should also appear in the Console (bottom left pane) if you have correctly executed it. 
+        
+* After your code executes, you can see the output after your chunk in the Source pane or in the Console pane. You can view the output in a new window, delete the ouput after the chunk
+    
+* The gear wheel and the downward play arrow within the chunk will allow you access chunk preferences or play all previous chunks (depending on where your cursor is). 
+```{r}
+1 - 1
+1 + 1
+1 + 2
+```
+* It's important to annotate your code to remind yourself what different lines of code mean, why you used this particular function, etc. 
+    
+    + You can make notes outside the chunk by typing as usual. If you're interested in formatting text OUTSIDE the chunk there is a resource on how to do so here: [R Markdown Cheatsheet](https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf). 
+        
+    + If you would like to make notes inside the chunk, add a '#' before your note and type as usual. Your notes will be colored green. Your code will be everything NOT in green. 
+```{r}
+1 + 1 # addition
+1 - 1 # subtraction
+1 * 1 # multiplication
+1 / 1 # division
+```
+
+#### E. Functions, arguments and variable assignment 
+        
+* Why are functions important?
+    
+    + We often want R to something more complicated than basic mathematical calculations. To do this, we must use **functions**, which are summarized bits of code that perform a specific task. Whether that be generating data, manipulating the data into a new structure, performing a statistical analysis or graphically displaying data, you will need to know to call and use a function. Functions can be written yourself or you can use functions that have been pre-defined in `base` R (provided functions with original installation) or external R packages (functions written by everyday users like yourself!).
+    
+\newline
+* There are two pieces to running code in R: 
+    
+  + **Functions** - This tells R what we want it to do for us. Functions will always be followed by a set of parentheses. For example, there is a `sum()` function in R that tells R we want it to calculate the sum for a set of variables. 
+        
+  + **Arguments** - Within the function (within the parentheses) you must supply an argument(s). Arguments tell the function -- (1) how you would like it to perform that task and (2) what data you want the task performed on. 
+    
+* To see the variety of arguments that are available within a function --
+```{r}
+?sum # or type the function in the 'Help' tab to see all documentation
+```
+
+```{r}
+sum(1, 2, 3, 4) 
+
+# What is the function?
+# What are the arguments? 
+```
+
+```{r}
+sum(1, 2, 3, NA, na.rm = TRUE) 
+
+# What is the function? 
+# What are the arguments? 
+```
+
+#### F. Variable Assignment
+
+* A **variable** (more generally called an **object**) is data we save in our R environment. If we do not assign information as a variable, we have no way to call, save or manipulate data in the R environment. The assignment operator is <- or =. In words, imagine this symbols as 'is' or 'gets'. **Variables** that you assign in R can also be called into functions and thus would also be categorized as an **argument** in that context. You should also get into the habit of saving any output generated by **function**. 
+```{r}
+y <- 5 # this assigns 'y' as 5, but you will not see an output unless you call the assigned variable
+
+y # if we call, 'y' we should see the output as '5'
+```
+
+```{r}
+y = 5 # this does the exact same thing, but use <- exclusively, except when working within a function 
+```
+  
+```{r}
+y <- 4 # this reassigns 'x' as 4 and does NOT save the previous assignment, so be careful! 
+
+# How can we confirm the change in variable assignment?
+```
+
+```{r}
+#3 <- 5 # you can't use any numerics in your assignment!
+#3.dog <- 5 # you can't use any numerics in your assignment!
+```
+
+```{r}
+# You can assign larger pieces of data such as --
+
+z <- 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8
+z
+```
+
+```{r}
+# Best practices recommend that you assign new variables after a modification, rather than overwriting previous variables. 
+
+# For example -- 
+
+x <- 4 # assign x as 4
+
+x
+
+y <- 2 # assign y as 2
+
+y
+
+xy <- x + y # Let's say we want to add x and y, we should name the output something different from our input values of 'x' or 'y'. 
+xy
+```
+
+#### G. How to save your workspace and your data
+
+* When you change anything within your .Rmd file the title will turn red and an asterisk will appear. You can save changes by pressing the save button. 
+    
+* If you would like create a new file -- you'll go the top left hand corner of the screen (white page with green plus symbol) and select 'R notebook'. Make sure to press the save button and remember where you have saved it! 
+    
+* If you're using a personal computer, it would be ideal to create a new folder on your desktop to create an R project (see below). If you will be using the lab computers, do not count on your files being saved after you log out, so make sure to email the file to yourself or upload it to a cloud based service (e.g., Box, Dropbox, Google Drive). 
+
+### 3. How do we generate, categorize and manipulate data? 
+    
+#### A. Types of data in R
+
+* A **vector** is one-dimensional sequence of data of the same type (e.g., a string of numbers). This is the most basic data type in R. 
+
+* A **matrix** is a data element in two-dimensions (has rows and columns). Same as vector, the components in a matrix must be of the same basic type (e.g., all numbers). 
+
+    + An **array** is similar to a matrix, but can be used for higher-order dimensional data. We won't cover these explicitly, but there are functions to generate them. 
+    
+    + Vectors, matrices and arrays can only hold one data type, but what if we want to hold data that contains characters and numbers? 
+    
+* A **data frame** is more general than a matrix, in that different columns can have different data types within them (numeric, character, factor, etc.). The data frame is the most common data type we are going to use in this class.
+
+* A **list** is an ordered collection of data A list allows you to gather a variety of (possibly unrelated) objects under one name because there is no restriction on data types or length of the components. [We've already created one in the previous section.]
+
+#### B. Vectors
+
+* We can create vectors with the `c()` or concatenate function:
+```{r}
+x <- 1 # this is a vector
+x
+
+y <- c(1, 3, 5 , 7) # we can also use the `c()` function, which stands for concatenate, to create a string of vectors 
+y
+
+z <- c(x, y) # `c()` can also concatenate multiple vectors
+z
+```
+
+* We can also create vectors with the colon operator to generate a sequence of numbers:
+```{r}
+x <- 1:10
+x
+```
+
+* We can use the `seq()` function create a sequence of values in pre-defined steps: 
+```{r}
+seq(from = 0, to = 10, by = 2)
+
+# are there other arguments we can use?
+?seq
+```
+
+* We can use the `rep()` function to repeat or replicate values as well: 
+```{r}
+rep(1:3, times = 2) # repeats the sequence 1 to 3 twice 
+
+rep(1:3, each = 2) # repeats each variable twice in the sequence of 1 to 3
+
+rep(1:3, length.out = 10) # repeats the sequence 1:3 with a vector of length 10
+
+x <- 1:5
+rep(x, length.out = 10) # the input can also be a vector
+
+# are there other arguments we can use? 
+```
+
+* Vectors can be manipulated in the same way numerical values can:
+```{r}
+x <- c(1:10)
+x
+
+y <- c(1, 2, 1, 8, 3, 2, 4, 3, 1, 2)
+y
+
+x + y
+x - y
+x * y
+x / y
+```
+
+* If your vectors are different lengths, the shorter one is repeated (sometimes fractionally): 
+```{r}
+x <- c(1:10)
+y <- c(1,2)
+x
+y
+
+x + y
+x * y
+```
+
+* The `length()` function returns the number of elements in a vector
+```{r}
+length(x)
+```
+
+* Brackets are useful to identify parts of a vector. This idea will be important when we move to two-dimensional data with rows and columns:
+```{r}
+x <- c(1:10) # one dimensional vector
+
+x[1] # first element of the vector
+
+x[2] # second element
+
+x[length(x)] # last element 
+
+x[1:3] # first three elements
+
+x[-1] # first element excluded
+
+x[x < 5] # what does this do?
+
+x < 5 # what is the difference between this line and the code above it? 
+```
+
+* Logical operators are also useful for all data types: 
+```{r}
+x <- seq(1:10)
+x
+
+y <- seq(11:20)
+
+y <- x < 5
+z <- x < 7
+y
+z
+
+# List of logical operators:
+# <, <= less than or less than or equal to
+# >, >= greater than or greater than or equal to
+# == for exact equality
+# != for inequality
+```
+
+#### C. Matrices and Arrays
+* Matrices have dimensions and vectors do not. We can use the `dim()` command to get the dimensions of a matrix: 
+```{r}
+x <- c(1:10)
+x
+dim(x) # does not work for a vector
+
+x <- matrix(1:10, nrow = 2, ncol = 5, byrow = T)
+x
+dim(x) # works
+```
+
+* The `array()` function also works: 
+```{r}
+x <- array(1:20, dim=c(4,5))
+x
+```
+
+* You can initialize (or pre-fill) vectors, matrices or arrays with zeros or NAs: 
+```{r}
+a <- rep(0, times = 10)
+a
+
+b <- matrix(1:10, nrow = 2, ncol = 5, byrow = T)
+b
+
+c <- array(0, dim = c(3, 10))
+c
+
+# You can also use NA (Not Available) or NaN (Not a Number) to pre-fill data types
+d <- rep(NaN, times = 10)
+d
+```
+
+* You can also transpose a matrix with the `t()` function to switch the rows and columns:
+```{r}
+x
+t(x)
+```
+
+#### D. Data Frames
+
+* You can think of a data frame as a more generalized form of a matrix. Whereas a matrix can only hold information of one type (e.g., numbers), a data frame can hold information of different types column-wise. 
+
+* Column Types (with examples)
+    + Character : "a", "b", "c"
+    + Numeric : 10, 10.2
+    + Integer : 5
+    + Logical : TRUE or FALSE
+    + Complex : 1 + 4i 
+    + Factors : "low", "medium", "high"
+```{r}
+dat <- data.frame(id = letters[1:10], x = seq(0, 0.9, by = 0.1), y = 1:10L, answer = c(TRUE, FALSE))
+
+dat
+
+str(dat)
+```
+* Again, we can see the dimensions, or shape, of the data frame like this:
+```{r}
+dim(dat)
+
+# How many rows and columns are there? 
+```
+* If we want to get a single value from the data frame, we can provide an index in square brackets:
+```{r}
+# Take the value in the 1st row and 2nd column of dat, and store it in x
+x <- dat[1, 2]
+x
+
+# Take the value in the 20th row and 4th column of dat, and store it in y
+y <- dat[20, 4]
+y
+```
+* We can select whole sections as well. For example, we can select the first ten frogs (rows) of values for the first four variables (columns) like this:
+```{r}
+p <- dat[1:2, 1:2] # similar to when creating vectors, the : symbol tells are to start index 1 and go to index 2, this does not need to start 1
+
+p
+```
+* You can also use the `c()` function select non-contiguous values: 
+```{r}
+dat[c(1, 3, 5), c(2, 3, 4)]
+```
+* We also don't have specify explicit rows and columns if we want all rows or all columns: 
+```{r}
+# All columns from row 1
+dat[1, ]
+
+# All rows from column 4
+dat[, 4]
+```
+
+#### E. Lists
+
+* Lists are another useful way to store data of different types in an ordered way:
+```{r}
+abc <- letters[1:10]
+b <- seq(0, 0.9, by = 0.1)
+y <- 1:10
+answer <- c(TRUE, FALSE)
+
+new.list <- list(abc, b, y, answer)
+new.list
+str(new.list)
+
+# Similar to subsetting in a data frame, you can isolate elements of a list with 
+    # [[]] - within a given list
+    # [] - within a given data type
+
+new.list[[1]][1]
+```
+
+#### G. List of useful functions to create and explore data structure
+
+* Functions to create & explore data structure 
+    + `c()` - concatenate function
+    + `:` - colon operator for sequence generation
+    + `seq()` - sequence generation
+    + `rep()` - replicate elements of vectors and lists
+    + `View()` - invoke a data viewer
+    + `length()` - length of an object
+    + `class()` - object class
+    + `head()` - return the first 6 rows of an object
+    + `tail()` - return the last last 6 rows an object
+    + `dim()` - returns the dimensions of an object 
+    + `nrow()` - number of rows
+    + `ncol()` - number of columns
+    + `str()` - display the structure of each column of an object
+    + `names()` - display the names of an object, typically the column names
+    + `nlevels()` - categorial levels within an object
+    + `cbind()` - combine objects by columns
+    + `rbind()` - combine objects by rows
+    + `rm()` - remove an object
+    + `edit()` - edit an object
+    + `t()` - transpose a matrix or dataframe
+    + `is.data.frame()` - check if you data is a data frame
+    + `as.data.frame()` - coerce your data to a data frame
+    + `is.matrix()` - check if your data is a matrix
+    + `as.matrix()` - coerce your data to a matrix
+
+* Basic mathematical functions for summary statistics
+    + `sum()`
+    + `mean()`
+    + `min()`
+    + `max()`
+    + `sd()`
+    + `median()`
+    + `summary()`
+
+### 5. How can we repeat code? : Introduction to the 'for' loop
+
+#### A. Why use the `for()` loop?
+Imagine trying to do an iterative process over a large dataset - 
+```{r}
+mat.new <- matrix(rnorm(50, 1:100), nrow = 5, ncol = 5, byrow = T)
+
+mat.new
+
+sum(mat.new[, 1])
+sum(mat.new[, 2])
+sum(mat.new[, 3])
+sum(mat.new[, 4])
+sum(mat.new[, 5])
+# and so forth - is this the most efficient way to do something? 
+```
+
+#### B. Let's write a `for()` loop 
+
+* The basic structure of a for loop is: 
+
+for (variable in a collection of variables) {  
+expression(s)  
+}  
+
+* Important points to remember: You must always create an emtpy data type (e.g., vector) to store the output of your data. Any data generated within your loop will be not be saved, unless you use **variable assignment** within the loop. 
+
+* For example, if we wanted to add 5 to each element of the vector x, and store it in vector y, we could do it with a `for()` loop:
+```{r}
+x <- 1:10 # make a vector 
+
+y <- rep(NaN, length(x))  # create an object y to hold the answer by repeating the number 0 into a vector of the same length as x (i.e., 9 slots)
+
+for (i in 1:length(x)) { # for every number in the vector x, starting at the first variable
+  y[i] <- x[i] + 5 # add five to it and store it in the vector y, our new values will overwrite y 
+}
+
+y
+```
+
+* However, in R, we can do this much more efficiently using the <- command (because x is vectorized), so you don't need a `for()` loop for everything!
+```{r}
+y <- x + 5
+y
+```
+
+*'i' can be whatever you like, it just has to be consistent across the loop!
+```{r}
+x <- 1:10
+
+y <- rep(NaN, length(x) - 1) 
+ 
+for (puppies in 1:length(x) - 1) {
+  y[puppies] <- x[puppies] + x[puppies + 1] 
+}
+
+y
+```
+
+* Example using a logical statement 
+```{r}
+x <- c(1:10)
+
+emptydat <- rep(NA, length(x))
+
+for (i in 1:length(x)){
+   emptydat[i] <- ifelse(x[i] > 5, "yes", "no")
+}
+
+emptydat
+```
+
+#### D. Think, pair and share 1
+
+* Write a `for()` loop that (1) iterates over the numbers 1 to 10, (2) calculates the cube of each number and (3) saves the output in a storage vector. 
+```{r}
+x <- 1:10
+
+y <- rep(NaN, length(x))
+
+for(i in 1:length(x)) { # for(i in x) is also correct...
+  y[i] <- x[i]^3
+}
+
+y
+```
+
+#### E. Think, pair and share 2
+
+* Write a `for()` loop that (1) iterates over the numbers 1 to 10, (2) adds each variable to the variable that succeeds it in vector x (e.g., 1 + 2; 2 + 3; etc.) and (3) saves the output in a storage vector.
+```{r}
+x <- 1:10
+
+y <- rep(NaN, length(x) - 1) 
+ 
+for (i in 1:9) { # or 2:length(x) - 1
+  y[i] <- x[i] + x[i + 1] 
+}
+
+y
+```
+
+***
+
+### 6. Homework exercise
+
+* Homework 
+
+1A. Use the : or c() or seq() function to create a vector of numbers that ranges from 1 to 10. (1 pt)
+1B. Name the vector "vector.1" using variable assignment. (1 pt)
+1C. Print the vector. (1 pt)
+```{r}
+vector.1 <- 1:10 # or c(1:10) or seq(1:10)
+vector.1 # or print(vector.1)
+```
+
+2A. Use the rep() function to create a holding vector for a for() loop populated with NaN. Make this vector the same length as vector.1 from #1 (a length of 10). (1 pt)
+2B. Name the vector "vector.2" using variable assignment. (1 pt)
+2C. Print the vector. (1 pt)
+```{r}
+vector.2 <- rep(NaN, length(vector.1)) # or rep(NaN, 10)
+vector.2
+```
+
+3. Write in words what each line of code means. Some lines have been annotated for you. (5 pts)
+```{r}
+vector.1 <- 1:10 # Create a sequence of numbers from 1 to 10. Use variable assignment to name the holding vector as "vector.1".
+
+vector.1 # Print number.vector
+
+vector.2 <- rep(NaN, times = length(vector.1)) # Create a holding vector. Repeat "NA" 100 times and use variable assignment to name the holding vector as "vector.2".
+
+for(i in 1:length(vector.1)) { # For every variable in vector.1... # for(i in vector.1) is actually the most correct answer, but they will use 1:length(x) a lot in this class...
+  vector.2[i] <- vector.1[i] + 1 # Add 1 to it and place the new number in vector.2 with variable assignment
+}
+
+vector.2 # Print vector.2
+```
+
+4. In #3 you used the letter 'i' to denote each variable in vector.1 and vector.2. If you replaced 'i' with 'j', would anything change about your output? Please explain your answer. (2 pts)
+No, because i is a generic placeholder for any variable within vector.1 and vector.2 and can be replaced with any alphabetical value as long as the replacement is consistent across the loop. 
+
+5. We will use a for() loop to iterate over a vector and solve for variable 'y' using the `y = mx + b` equation. Please follow the prompts below. Some prompts have been completed for you. (7 pts)
+```{r}
+# Use variable assignment to assign 10 as b and 1 as m
+b <- 10
+m <- 1
+
+# Create a vector that ranges from 1 to 100 and name it 'x' using variable assignment. (2 pts)
+x <- 1:100 # WILL BE EMPTY FOR STUDENTS
+
+# Create a holding vector for 'y' using the rep() function that is of the same length as vector x, but populate this vector with NaN. (2 pts)
+y <- rep(NaN, length(x)) # WILL BE EMPTY FOR STUDENTS
+
+# Write out what each line below means in words:
+for (i in 1:length(x)) { # WRITE YOUR ANSWER HERE: for every variable i from 1 to the length of x (100)... (1pt)
+  y[i] <- m * x[i] + b # WRITE YOUR ANSWER HERE: multiply each value in vector x to m (1) and add it to b (10), then store this new value in a holding vector y (1pt)
+}
+
+# Print y (1 pt)
+y
+
+# Use the plot function to plot y as a function of x 
+plot(y~x)
+```
+
+***
+
+### 7. More resources for more R fun
+
+* Portions of this tutorial were adapted from the following resources (which you should most certainly check out!): 
+
+    + [Programming with R](https://swcarpentry.github.io/r-novice-inflammation/)
+
+    + [Prelude to R](https://preludeinr.com/) by Florent Bled
+
+    + [Introducing R](https://data.princeton.edu/R/readingdata) by Germán Rodríguez
+    
+* This is a great handy 'cheat sheet'. There are many more types of 'cheatsheets' that cover `base` R functions and other external packages [here](https://www.rstudio.com/resources/cheatsheets/). 
+
+    + [Base R Cheatsheet](https://www.rstudio.com/wp-content/uploads/2016/10/r-cheat-sheet-3.pdf) by Mhairi McNeill
+
+***
