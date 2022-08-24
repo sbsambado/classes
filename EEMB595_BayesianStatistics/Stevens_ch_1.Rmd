@@ -1,0 +1,153 @@
+---
+title: "APrimer"
+author: "Bart_DiFiore"
+date: "February 1, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, include = F)
+```
+
+```{r libraries}
+
+library(primer)
+data(sparrows)
+
+```
+
+
+1.1. Geometric growth Analyze the following data, relying on selected snip- pets of previous code.
+(a) In the years 1996 through 2005, lily population sizes are N = 150, 100, 125, 200, 225, 150, 100, 175, 100, 150. Make a graph of population size versus time. 
+(b) Calculate R for each year; graph R vs. time.
+(c) Calculate arithmetic and geometric average growth rates of this population. 
+(d) Based on the appropriate average growth rate, what would be the expected population size in 2025? What would the estimated population size be if you used the inappropriate mean? Do not use simulation for this.
+(d*) Given these data, develop simulations as above with the user-defined func- tion, PopSim. Describe the distribution of projected population sizes for 2010.
+
+
+
+```{r ch1_stevens_problem1a}
+
+#Problem 1 
+
+#a) 
+df <- data.frame(N = c(150, 100, 125, 200, 225, 150, 100, 175, 100, 150), year = seq(1996, 2005, by=1))
+
+plot(N~year,data = df, type="b")
+
+#b)
+t <- length(df$N)-1
+R <- df$N[2:(t + 1)]/df$N[1:t]
+
+plot(df$year[1:t], R, type="b")
+
+#c)
+lam.A <- sum(R)/t
+lam.G <- prod(R)^(1/t)
+
+#d) Based on the appropriate average growth rate, what would be the expected population size in 2025? What would the estimated population size be if you used the inappropriate mean? Do not use simulation for this.
+
+N0 <- df$N[1]
+time <- 2025 - min(df$year)
+#Nt <- N0 * lambda^time
+
+      #with arithmetic
+        (Nt.a <- N0 * lam.A^time)
+        
+      #with geometric (I think this one is the appropriate one...BD)
+         (Nt.g <- N0 * lam.G^time)
+
+#(d*) Given these data, develop simulations as above with the user-defined func- tion, PopSim. Describe the distribution of projected population sizes for 2010.
+
+set.seed(3) #ensures same random draw
+
+years <- 2025 - min(df$year)
+
+y.2010 <- 2010 - min(df$year)
+
+out <- PopSim(Rs = R, N0 = N0, years = years, sims = 1000)
+
+sum.2010 <- out[y.2010,]
+
+d <- par(mfrow=c(1,2))
+hist(sum.2010, main = "N", breaks = 50)
+hist(log10(sum.2010 + 1), main = "log(N+1)", breaks = 50)
+abline(v = log10(quantile(sum.2010, prob = c(0.0275, 0.975)) + 1), lty = 3)
+par(d)
+
+matplot(out, type="l") #plots each column as a line (default, maybe)
+
+```
+
+1.2. Doubling Time
+(a) Derive the formula for doubling time in a population with contiunous ex- ponential growth.
+(b) What is the formula for tripling time?
+(c) If we are modeling humans or E. coli, would a model of geometric, or expo- nential growth be better? Why?
+(d) If an E. coli population grew from 1000 cells to 2 × 109 cells in 6 h, what would its intrinsic rate of increase be? Its doubling time?
+
+```{r ch1_stevens_problem1b}
+
+#a) Derive the formula for doubling time in a population with contiunous ex- ponential growth.
+
+2n0 <- n0 * e^(rt)
+
+2 <- e^(rt)
+
+ln(2) <- rt
+
+t <- ln(2)/r
+
+#b) What is the formula for tripling time?
+
+t3 <- ln(3)/r
+
+#c) If we are modeling humans or E. coli, would a model of geometric, or exponential growth be better? Why?
+  #exponential... its continuous
+
+#d) If an E. coli population grew from 1000 cells to 2 × 10^9 cells in 6 h, what would its intrinsic rate of increase be? Its doubling time? 
+
+2*10^9 <- 1000*exp(r*6)
+
+(r <- log(2*10^6)/6)
+#doubling time 
+log(2)/r
+
+```
+
+
+
+1.3. Human Population Growth
+(a) There were about 630 million people on the planet in 1700, and 6.3 billion in 2003 [33]. What was the intrinsic rate of increase, r?
+(b) Graph the model of human population size population size from 1700 to 2020.
+(c) Add points on the graph indicating the population doublings from 1700 onward.
+(d*) What will prevent humans from outweighing the planet by the end of this century? What controls human population growth? Do these controls vary spatially across the planet? See Cohen [33] to get going.
+1.4. R functions
+Find the R functions in Chapter 1. Demonstrate their uses.
+
+```{r ch1_stevens_problem1c}
+#a)There were about 630 million people on the planet in 1700, and 6.3 billion in 2003 [33]. What was the intrinsic rate of increase, r?
+
+r <- log(6.3*10^9/6.3*10^6)/(2003-1700)
+
+exp.growth <- function(t, r, n0){
+  n0*exp(r*t)
+}
+
+cont.double <- function(r){log(2)/r}
+
+year <- data.frame(year = seq(1700, 2020, by = 1), t = seq(0,2020-1700, by =1))
+N <- exp.growth(t=year$t, r=r, n0 = 6.3*10^6) 
+
+#b) Graph the model of human population size population size from 1700 to 2020.
+plot(N~year$year, type = "b")
+
+#c) Add points on the graph indicating the population doublings from 1700 onward.
+temp <- cont.double(r)
+doubling.points <- exp.growth(t = seq(0,320, by = temp), r = r, n0=6.3*10^6)
+
+plot(N~year$t, type = "b")
+points(x = seq(0, 320, by = temp), y = doubling.points, col = "red", pch = 3)
+
+```
+
+1 

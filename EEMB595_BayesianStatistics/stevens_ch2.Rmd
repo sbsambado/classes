@@ -1,0 +1,332 @@
+---
+title: "stevens_ch2"
+author: "A_Bui"
+date: "2/22/2018"
+output: html_document
+---
+
+```{r get_ya_library, echo = FALSE}
+rm(list = ls())
+library(primer)
+```
+
+Chapter code
+
+``` {r matrices, echo = FALSE}
+
+#define two matrices M and N
+M <- matrix(1:4, nr = 2, byrow = T)
+N <- matrix(c(10, 20, 30, 40), nr = 2)
+
+#multiply matrices together
+M %*% N
+```
+
+``` {r stage-structured_growth, echo = FALSE}
+
+#create population projection matrix A and vector of stage class abundances for year zero N0
+A <- matrix(c(0, 0.5, 20, 0.3, 0, 0, 0, 0.5, 0.9), nr = 3, byrow = TRUE)
+N0 <- matrix(c(100, 250, 50), ncol = 1)
+
+#multiply A and N0 together to see how population changes
+N1 <- A %*% N0
+N1
+```
+
+``` {r stage-structured_growth_multiple_steps, echo = FALSE}
+
+#project population over six years using for-loop (instead of sapply, because each year depends on previous year)
+#set number of years to project, then create a matrix to hold results, put N0 in first column
+#why N0 in first column??????
+years <- 6
+N.projections <- matrix(0, nrow = nrow(A), ncol = years + 1)
+N.projections[, 1] <- N0
+
+#this is the for-loop
+for (i in 1:years) N.projections[, i + 1] <- A %*% N.projections[, i]
+
+#graph results for each stage - transpose projection matrix so that the data are in columns and not rows
+#whyyyyyy do you have to do this
+matplot(0:years, t(N.projections), type = "l", lty = 1:3, col = 1, ylab = "Stage Abundance", xlab = "Year")
+legend("topleft", legend = c("Seeds", "Small Adult", "Large Adult"), lty = 1:3, col = 1, bty = "n")
+```
+
+``` {r annual_growth_rate, echo = FALSE}
+
+#calculate Rt = N(t+1)/Nt for each year t
+#sum all stages using apply sum function to each column
+N.totals <- apply(N.projections, 2, sum)
+
+#get each Rt by dividing all N(t+1) by each Nt
+#use negative indices why????
+Rs <- N.totals[-1]/N.totals[-(years + 1)]
+
+#plot each R in each year t
+plot(0:(years - 1), Rs, type = "b", xlab = "Year", ylab = "R")
+```
+
+``` {r eigenanalysis, echo = FALSE}
+
+#first of all, what the fuck is eigenanalysis
+eigs.A <- eigen(A)
+eigs.A
+
+$values
+$vectors
+```
+#why this error???
+
+```{r finding_lambda, echo = FALSE}
+
+#find index position of largest absolute value of eigenvalues, usually the first eigenvalue
+dom.pos <- which.max(eigs.A[["values"]])
+
+#use Re to keep real part and drop imaginary part, what the fuck does that mean
+L1 <- Re(eigs.A[["values"]][dom.pos])
+L1
+```
+
+``` {r power_iteration_method_of_eigenanalysis, echo = FALSE}
+
+#power iteration method is one way of performing eigenanalaysis - not especially efficient but works with specific applications
+#not used by R so why the fuck???
+#let t be big, rescale N
+t <- 20
+Nt <- N0/sum(N0)
+
+#create for-loop that reuses Nt for each time step and make sure you have an empty numeric vector to hold the output
+R.t <- numeric(t)
+for (i in 1:t) R.t[i] <- {
+    Nt1 <- A %*% Nt
+    R <- sum(Nt1)/sum(Nt)
+    Nt <- Nt1/sum(Nt1)
+    R
+}
+
+#compare result to point estimate of lambda1
+par(mar = c(5, 4, 3, 2))
+plot(1:t, R.t, type = "b", main = quote("Convergence Toward " * lambda))
+points(t, L1, pch = 19, cex = 1.5)
+```
+
+``` {r calculating_stable_stage_distribution, echo = FALSE}
+
+#dominant eigenvector 'w' is in same position as dominant eigenvalue
+#extract 'w' keeping the real part, and divide by sum to get stable stage distribution
+w <- Re(eigs.A[["vectors"]][, dom.pos])
+ssd <- w/sum(w)
+round(ssd, 3)
+```
+
+``` {r calculating_reproductive_value, echo = FALSE}
+
+#don't understand any of this!!!!
+M <- eigen(t(A))
+v <- Re(M$vectors[, which.max(Re(M$values))])
+RV <- v/v[1]
+RV
+```
+
+``` {r sensitivity_of_projection_matrices, echo = FALSE}
+
+#first, calculate numerator v(ij)*w(ij)
+vw.s <- v %*% t(w)
+
+#then, sum to get denominator v * w
+#after, divide to get sensitivities
+#use as.numeric to convert 1x1 matrix of dot product into scalar, after which R multiplies each element
+(S <- vw.s/as.numeric(v %*% w))
+```
+
+``` {r elasticity_projection_matrices, echo = FALSE}
+elas <- (A/L1) * S
+round(elas, 3)
+```
+
+``` {r get_ya_data, echo = FALSE}
+data(stagedat)
+data(fruitdat)
+data(seeddat)
+```
+
+``` {r confronting_demographic_models_with_data_fertility, echo = FALSE}
+
+#2.3.4: Estimating projection matrix
+
+#create zero matrix to fill
+mat1 <- matrix(0, nrow = 5, ncol = 5)
+
+#for each stage, get mean fertility by applying mean to each stage of fertility data
+#Stage is a factor (what does that mean) and tapply will calculate mean for each level of factor
+#assume half the seeds are male, so divide fertility by 2 to get fertility for just female seeds
+ferts <- tapply(fruitdat$Y2004, fruitdat$Stage, mean)/2
+ferts
+
+#put ferts into matrix established above
+mat1[1, 4] <- ferts[1]
+mat1[1, 5] <- ferts[2]
+```
+
+``` {r confronting_demographic_models_with_data_seed_transitions, echo = FALSE}
+
+#Seed transitions
+
+#get frequencies of each seed fate
+seed.freqs <- table(seeddat[, 1])
+seedfates <- seed.freqs/length(seeddat[, 1])
+seedfates
+
+#put seed transitions into projection matrix
+mat1[1, 1] <- seedfates[2]
+mat1[2, 1] <- seedfates[3]
+```
+
+``` {r confronting_demographic_models_with_data_vegetative_stage_transitions, echo = FALSE}
+
+#calculate transition probabilities for vegetative stages
+#two for-loops will calculate transitions and put into stages 2-5
+#for-loop functions (a) subset data for each stage in 2003, (b) count total number individuals in each stage in 2003 (year j), (c) sum number of individuals in each stage in 2004 given each stage for 2003, and (d) calculate proportion of each stage in 2003 that shows up in each stage for 2004
+for (i in 2:5) {
+  for (j in 2:5) mat1[i, j] <- {
+    x <- subset(stagedat, stagedat$Y2003 == j)
+    jT <- nrow(x)
+    iT <- sum(x$Y2004 == i)
+    iT/jT
+  }
+}
+
+#a few things! can we go over what parts of this for-loop have these functions??
+round(mat1, 2)
+#also what the FUCK is round??
+#diagonal elements are stasis probabilities, lower off-diagonal is growth from one stage to the next, upper off-diagonal is regression
+#fertilities are top row in columns 4 and 5
+#P53 is transition element - rapid growth
+```
+
+``` {r confronting_demographic_models_with_data_one_function_to_rule_them_all, echo = FALSE}
+
+ProjMat(stagedat, fruitdat, seeddat)
+```
+
+``` {r confronting_demographic_models_with_data_DemoInfo, echo = FALSE}
+
+#DemoInfo is function that performs eigenanalyses and manipulations that gave lambda, stable age distribution, reproductive value, sensitivity and elasticity matrices
+str(DemoInfo(mat1))
+#returns list with six components, but last part is projection matrix
+```
+
+``` {r bootstrapping_demographic_matrix}
+
+#resample data, but for what?
+
+#first, get number of observations in original data
+nL <- nrow(stagedat)
+nF <- nrow(fruitdat)
+nS <- nrow(seeddat)
+
+#use lapply to
+#1. resample observations to get bootstrapped data sets for vegetative stages, seed fates, and fertilities,
+#2. calculate the projection matrix based on the three bootstrapped data sets,
+#3. perform eigenanalysis and calculate lambda, stage structure, sensitivities, and elasticities
+
+#first, set number of simulations (usually this is on order of 1000s or something)
+n <- 5
+
+#then, use lapply to do some replicate simulation n times
+#stores n replicates in list that is n components long
+#each of n componenets is output of DemoInfo, which is also a list
+out <- lapply(1:n, function(i) {
+ stageR <- stagedat[sample(1:nL, nL, replace = TRUE), ]
+ fruitR <- fruitdat[sample(1:nF, nF, replace = TRUE), ]
+ seedR <- as.data.frame(seeddat[sample(1:nS, nS, replace = TRUE), ])
+ matR <- ProjMat(stagedat = stageR, fruitdat = fruitR, seeddat = seedR)
+ DemoInfo(matR)
+ })
+
+#sample draws row numbers at random with replacement to create random draws of data
+#ProjMat generates projection matrix with random data
+#DemoInfo performs eigenanalysis and demographic calculations
+
+#look at small subset of output with five lambda generated from five different bootstrapped data sets.
+#out is a list, so use sapply to do the same thing to each component of the list
+#which in this case is to extract bootstrapped lambda
+sapply(out, function(x) x$lambda)
+```
+
+``` {r DemoBoot_function, echo = FALSE}
+
+#use function DemoBoot, which combines all functions
+args(DemoBoot)
+#arguments are raw data and n
+```
+
+``` {r demographic_analysis_part1, echo = FALSE}
+
+#1. interpret point estimates of demographic information, including lambda and elasticities.
+#2. ask whether lambda differs significantly from 1.0 using bootstrapped confidence interval
+
+#1.
+estims <- DemoInfo(ProjMat(stagedat, fruitdat, seeddat))
+estims$lambda
+
+#2. lambda is greater than one. onwards
+```
+
+``` {r demographic_analysis_part2, echo = FALSE}
+
+#lambda is greater than one, so population is growing. what transitions are important?
+round(estims$Elasticities, 4)
+
+#most important transition is persistence in largest adult stage (a5,5 = 0.3)
+```
+
+``` {r demographic_analysis_part3, echo = FALSE}
+
+#use DemoBoot to bootstrap confidence interval for lambda
+#1. run bootstrap
+#2. plot lambdas.
+
+#1.
+system.time(out.boot <- DemoBoot(stagedat, fruitdat, seeddat, n = 1000))
+
+#2. 
+lambdas <- sapply(out.boot, function(out) out$lambda)
+hist(lambdas, prob = T)
+lines(density(lambdas))
+```
+
+``` {r demographic_analysis_part4, echo = FALSE}
+
+#to get a 'real' confidence interval, decide on some alpha then calculate quantiles
+#what the fuck does this mean
+alpha <- 0.05
+quantile(lambdas, c(alpha/2, 0.5, 1 - alpha/2))
+```
+
+#okay! well! your values are completely different! how ya feelin about that!
+
+``` {r demographic_analysis_part5_caveat_refinement, echo = FALSE}
+
+#bias (aka skewness of bootstrap replicates) causes bootstrap samples to differ from observed estimate
+#must adjust bootstrapped samples for bias
+#first, calculate bias
+bias <- mean(lambdas) - estims$lambda
+bias
+
+#since bias is small, confidence intervals are good
+#however, let's correct the samples anyway
+quantile(lambdas - bias, c(alpha/2, 0.5, 1 - alpha/2))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

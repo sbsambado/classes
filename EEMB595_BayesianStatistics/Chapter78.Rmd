@@ -1,0 +1,291 @@
+---
+title: "Chapter 7/8 Interactions"
+author: "Stephen R. Proulx"
+date: "5/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(brms)
+
+library(rethinking)
+```
+
+
+```{r load_process_data}
+data(rugged)
+d <- as_tibble(rugged)
+
+
+# make log version of outcome and  extract countries with GDP data
+d <- d %>% 
+  mutate(log_gdp = log(rgdppc_2000))%>%
+  drop_na(rgdppc_2000) %>% 
+  mutate(log_gdp_std=log_gdp/mean(log_gdp), rugged_std = rugged/max(rugged))
+```
+
+Fit separate models for the within Africa and other countries
+```{r}
+b7.1 <-
+  brm(data = filter(d ,cont_africa == 1), # in africa
+      family = gaussian,
+      log_gdp ~ 1 + rugged, # log of lgd is intercept + how rugged the country is
+      prior = c(prior(normal(1,1), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(cauchy(0,10), class = sigma)), # how positive
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,# parameters of sampling run
+      seed = 2312312) # repeatability
+
+b7.2 <- # out of africa
+  update(b7.1, # take stan object associated with it (binary program)
+         newdata = filter(d ,cont_africa == 0)) # replaces with new data
+ 
+```
+
+
+```{r}
+print(b7.1)
+print(b7.2)
+```
+
+```{r}
+nd <- 
+  tibble(rugged = seq(from = 0, to = 6.3, length.out = 30))
+
+f_b7.1 <- # fitted fxn is convenience fxn, does the work for ya
+  fitted(b7.1, newdata = nd) %>% # each point calculate mean in likelihood fxn for ruggedness value you're testing out, gives output that is a table for each sample value of mean for sampling distribution, take that mean
+  as_tibble() %>%
+  mutate(cont_africa = 1)%>%
+  bind_cols(nd) 
+
+f_b7.2 <-
+  fitted(b7.2, newdata = nd) %>%
+  as_tibble() %>%
+  mutate(cont_africa =0)%>%
+  bind_cols(nd)
+
+#put them back into a single data-frame for plotting purposes
+f <-
+  bind_rows(f_b7.1, f_b7.2) 
+
+ 
+
+ggplot(d,aes(x = rugged)) +
+  geom_smooth(data = f,
+              aes(y = Estimate, ymin = Q2.5, ymax = Q97.5,
+                  fill = as.factor(cont_africa), color = as.factor(cont_africa)),
+              stat = "identity", 
+              alpha = 1/4, size = 1/2)+
+  geom_point(aes(y = log_gdp, color = as.factor(cont_africa)),
+             size = 2/3) +
+  scale_x_continuous("Terrain Ruggedness Index", expand = c(0, 0)) +
+  ylab("log GDP from year 2000") +
+  theme(text = element_text(family = "Times"))  
+
+```
+Run the interaction model
+- put all 3 group models together
+```{r}
+b7.3 <-
+  brm(data = d,  # whole data set
+      family = gaussian,
+      log_gdp ~ 1 + rugged , # same intercept
+      prior = c(prior(normal(1,1), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(cauchy(0,10), class = sigma)),
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,
+      seed = 2312312)
+
+
+b7.4 <-
+  brm(data = d, # in africa
+      family = gaussian,
+      log_gdp ~ 1 + rugged + cont_africa, #same slope for ruggedness, different intercept
+      prior = c(prior(normal(1,1), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(cauchy(0,10), class = sigma)),
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,
+      seed = 2312312)
+
+b7.5 <-
+  brm(data = d,  # out of africa
+      family = gaussian,
+      log_gdp ~ 1 + rugged * cont_africa, # multiplying two factors to mean that both of them have an effective. Global slope, global intercept, difference in slope if you're in africa vs. outside of it
+      prior = c(prior(normal(1,1), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(cauchy(0,10), class = sigma)),
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,
+      seed = 2312312)
+
+
+```
+
+```{r}
+print(b7.3)
+print(b7.4)
+print(b7.5)
+
+```
+^ standard linear model focuses on reference case (way 1)
+^ brms plots is a more direct description of the linked model (way 2)
+
+Add information criterion to the model fits and compare!
+- output for both ways are the same in the way you plot them 
+```{r}
+b7.3<-add_criterion(b7.3,c("loo","waic"))
+b7.4<-add_criterion(b7.4,c("loo","waic"))
+b7.5<-add_criterion(b7.5,c("loo","waic"))
+
+
+l<-loo_compare(b7.3,b7.4,b7.5,
+            criterion = "waic")
+
+print(l, simplify = F)
+
+
+```
+
+
+Compare the interaction model with the "run them separately model"
+```{r}
+nd1 <- 
+  tibble(rugged = seq(from = 0, to = 6.3, length.out = 30),cont_africa=0)
+nd2 <- 
+  tibble(rugged = seq(from = 0, to = 6.3, length.out = 30),cont_africa=1)
+
+
+f_b7.5_A <-
+  fitted(b7.5, newdata = nd1) %>%
+  as_tibble() %>%  bind_cols(nd1)
+
+f_b7.5_N <-
+  fitted(b7.5, newdata = nd2) %>%
+  as_tibble() %>%
+  bind_cols(nd2)
+
+#put them back into a single data-frame for plotting purposes
+f_7.5 <-
+  bind_rows(f_b7.5_A, f_b7.5_N) 
+
+
+
+
+ggplot(d,aes(x = rugged)) +
+  geom_smooth(data = f_7.5,
+              aes(y = Estimate, ymin = Q2.5, ymax = Q97.5,
+                  fill = as.factor(cont_africa), color = as.factor(cont_africa)),
+              stat = "identity", 
+              alpha = 1/4, size = 1/2)+
+  geom_point(aes(y = log_gdp, color = as.factor(cont_africa)),
+             size = 2/3) +
+  scale_x_continuous("Terrain Ruggedness Index", expand = c(0, 0)) +
+  ylab("log GDP from year 2000") +
+  theme(text = element_text(family = "Times"))  
+
+
+ggplot(d,aes(x = rugged)) +
+  geom_smooth(data = f_7.5,
+              aes(y = Estimate, ymin = Q2.5, ymax = Q97.5,
+                 fill = as.factor(cont_africa), color = as.factor(cont_africa+2)),
+              stat = "identity") +
+    geom_smooth(data = f, # just predictions and intervals for the 2 ways to do this
+              aes(y = Estimate, ymin = Q2.5, ymax = Q97.5,
+                  fill = as.factor(cont_africa), color = as.factor(cont_africa)),
+              stat = "identity")+ scale_x_continuous("Terrain Ruggedness Index", expand = c(0, 0)) +
+  ylab("log GDP from year 2000") +
+  theme(text = element_text(family = "Times"))  
+
+
+
+
+```
+
+
+
+
+##continuous interaction data
+Tulip data
+
+```{r}
+data(tulips)
+d <- tulips
+
+d <-
+  d %>%
+  mutate(shade_c = shade - mean(shade),
+         water_c = water - mean(water))
+
+```
+
+```{r}
+b7.8 <-
+  brm(data = d, family = gaussian,
+      blooms ~ 1 + water_c + shade_c,
+      prior = c(prior(normal(130, 100), class = Intercept),
+                prior(normal(0, 100), class = b),
+                prior(cauchy(0, 10), class = sigma)),
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,
+      control = list(adapt_delta = 0.9),
+      seed = 7)
+
+b7.9 <- 
+  update(b7.8, 
+         formula = blooms ~ 1 + water_c + shade_c + water_c:shade_c)
+```
+
+```{r}
+print(b7.8)
+print(b7.9)
+
+b7.8<-add_criterion(b7.8,c("loo","waic"))
+b7.9<-add_criterion(b7.9,c("loo","waic"))
+
+loo_compare(b7.8,b7.9)
+
+```
+
+
+```{r}
+# loop over values of `water_c` and plot predictions
+shade_seq <- -1:1
+
+for(w in -1:1){
+  # define the subset of the original data
+  dt <- d[d$water_c == w, ]
+  # defining the data to be used for producing the model fit predictions
+  nd <- tibble(water_c = w, shade_c = shade_seq)
+
+    # Sample from the psoterior to produce fits for the mean values
+  f <- 
+    fitted(b7.9, newdata = nd) %>%
+    as_tibble() %>%
+    bind_cols(nd)
+  
+  # specify our custom plot
+  fig <- 
+    ggplot() +
+    geom_smooth(data = f,
+                aes(x = shade_c, y = Estimate, ymin = Q2.5, ymax = Q97.5),
+                stat = "identity", 
+                fill = "#CC79A7", color = "#CC79A7", alpha = 1/5, size = 1/2) +
+    geom_point(data = dt, 
+               aes(x = shade_c, y = blooms),
+               shape = 1, color = "#CC79A7") +
+    coord_cartesian(xlim = range(d$shade_c), 
+                    ylim = range(d$blooms)) +
+    scale_x_continuous("Shade (centered)", breaks = c(-1, 0, 1)) +
+    labs("Blooms", 
+         title = paste("Water (centered) =", w)) +
+    theme(text = element_text(family = "Times"))
+  
+  # plot that joint
+  plot(fig)
+}
+```
+
+

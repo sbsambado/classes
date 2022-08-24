@@ -1,0 +1,274 @@
+---
+title: "Covid Antibody reanalysis"
+author: "Stephen R. Proulx"
+date: "4/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(brms)
+
+library(rethinking)
+```
+
+This markdown does some fitting of the specificity of the covid-19 antibody tests as well as some MCMC fitting of the joint parameters for specificity and prevalence. It is very fragile becuase it directly computes the sum of the probabilities of each possible outcome and having large sample sizes causes underflows in the computation. 
+
+## do straight up calculations of the likelihood and posterior for the sensitivity, i.e. grid approx
+
+
+```{r grid_specificity}
+# grid approximization 
+# data to be binomially distributed
+# beta prior : data that are unbounded domain 1:0
+# just fitting the preCOVID data to get specificity
+
+#code to grid out the posterior
+
+n <- 1000 # steps to use
+
+#gamma is the specificity
+
+d_grid <-
+  tibble( gamma = seq(from = 0,   to = 1,   length.out = n)) 
+
+
+n_pre = 401 
+pos_pre = 2 
+n_sample=0 
+pos_pos = 0
+
+post <- d_grid %>% 
+  mutate(prior_gamma       = dbeta(gamma,  shape1=18, shape2=2, log = T)) %>%
+  mutate(log_likelihood = dbinom(pos_pre , size=n_pre , prob=1-gamma, log=TRUE)) %>%
+  mutate(unstd.posterior        = log_likelihood + prior_gamma) %>%
+  mutate(prob    = exp(unstd.posterior - max(unstd.posterior)))  
+  
+
+# prior
+ggplot(post,aes(x=gamma, y = exp(prior_gamma))) +
+  geom_line() 
+
+# posterior distribution, scaled to make max value 1, not normalized
+ggplot(post,aes(x=gamma, y = prob)) +
+  geom_line() +
+  scale_x_continuous(lim=c(0.9,1))
+
+```
+
+^ number of false positives pre COVID
+
+## Do Bayesian analysis of joint data on pre-covid assay and post-covid assay
+
+try again but sum it properly... This sort of works, but has a problem in that I'm summing over the possilbe combinations of false positives and true positives, so that if the sample size is large then we get underflows.
+
+
+What is the probability of this given the parameters data?
+convulusion : sum of random variable outputs
+```{r write_binomial_antibody, eval=FALSE}
+sink("model_binomial_antibody.stan")
+cat("
+    
+//I would like to add the sensitivity, but for now just assume all positives are positive    
+// the data block is where we specify how data will be passed to stan.
+  data {
+  int <lower=1> n_pre; // pre covid sample size
+  int<lower=0, upper=n_pre> pos_pre; // pre covid number positive
+  int <lower=0> n_sample ;// number sampled in the current post-covid pop
+  int <lower=0, upper=n_sample> pos_pos; // number positive post covid
+  real <lower=0, upper=1> prior_prev[2]; // bounds for the prior prevalence, we'll roll this into a uniform prior but include what we know, which is that at a minimum we know how many sick identified patients there are.
+  }
+// the parameter block is where we specify the parameters that stan will fit. In our previous examples, this would be the 
+// parameters that we make a grid to compute likelihoods over.
+parameters {
+  real <lower=0, upper=1> mu; // the proportion of the population that is positive
+  real <lower=0, upper=1> gamma ; // the specificity, the probability of a false positive
+}
+
+ 
+// the model block is where likelihoods get calculated. Later, with multi-level models, additional likelihood calculations would go here. The model block also includes priors.
+model {
+//some new variables we will need to convolute the binomials
+real log_prob1=0;
+real log_prob2=0;
+real nat_sum_probs=0;
+
+
+mu ~ uniform(prior_prev[1], prior_prev[2]); // apply our uniform prior.
+gamma ~ beta(18,2); // really we already know it is better than this, but I guess we are using all of the data available to show that
+
+
+#gamma ~ uniform(0.9,1); // really we already know it is better than this, but I guess we are using all of the data available to show that
+
+(n_pre-pos_pre)  ~ binomial(n_pre, gamma) ; 
+
+for( i in 0:pos_pos){ //we have to consider every possible scenario, where there are 0 true positives or as many as pos_pos true positives
+
+log_prob1 = binomial_lpmf(i | n_sample, mu);
+
+#  i ~ binomial(n_sample, mu) ; // prob that i are actually sick, true positives
+
+log_prob2 = binomial_lpmf( (pos_pos-i) | (n_sample-i), (1-gamma));
+
+nat_sum_probs += exp(log_prob1 + log_prob2) ;
+  
+# (pos_pos-i) ~ binomial((n_sample-i), (1-gamma)) ; // prob that exactly the remaining positive tests are false positives
+ 
+}
+
+target += log(nat_sum_probs);
+    
+}
+ 
+    
+    
+    ",fill = TRUE)
+sink()
+
+#prevalence_model<-stan_model('model_binomial_antibody.stan')
+#saveRDS(prevalence_model,file= "model.rds")
+
+## this model code is sensitive as you increase sample size
+```
+
+
+
+
+First run the fit with just the data on the pre-covid blood samples. This is a direct way to estimate the false postivie rate. Note that the algorithm still fits the disease prevalence, but it is just the prior.
+
+0 are preCOVID data
+```{r run_stan_1, include=FALSE}
+
+stan_data <-   list( n_pre = 401 , pos_pre = 2 , n_sample=0 , pos_pos = 0 , prior_prev = c(0,1))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 4,
+                      iter = 5000, seed = 213123)
+
+```
+
+```{r print_1}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+
+
+Now fit the actual data. This fits both the pre-covid and post-covid data at the same time. Note that the post covid data actually contain information about the false positive rate as well, because we expect to see the positives are both the true positives and the false positives. SPECIAL NOTE: We are only using half of the post-covid data to allow computation.
+
+- this is not the actual data, 3000 gives problems so we're using half the data (1500)
+```{r run_stan_2, include=FALSE}
+
+
+stan_data <-   list( n_pre = 401 , pos_pre = 2 , n_sample=1500 , pos_pos = 25 , prior_prev = c(0,0.31))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 4,
+                      iter = 5000, seed = 213123)
+
+```
+
+including this uncertainty in gamma to estimate mu
+median value of gamma is associated with preavelnce of ~1%
+
+is there a difference between pre and post COVID samples? Oh ya it's significant so we should use it
+
+using pair plot adjusts axis for you
+```{r print_2}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+Now try a case where the post-covid test have way fewer positives, say 3.
+```{r run_stan_3, include=FALSE}
+
+
+stan_data <-   list( n_pre = 401 , pos_pre = 2 , n_sample=1500 , pos_pos = 3 , prior_prev = c(0,1))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 4,
+                      iter = 5000, seed = 213123)
+
+```
+
+```{r print_3}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+
+
+
+Ok, so what if there are lots of positives in the post-covid set? The estimate of specificity doesn't change.
+```{r run_stan_4, include=FALSE}
+
+
+stan_data <-   list( n_pre = 401 , pos_pre = 2 , n_sample=1500 , pos_pos = 300 , prior_prev = c(0,1))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 4,
+                      iter = 5000, seed = 213123)
+
+```
+
+```{r print_4}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+
+
+
+
+What if we have no evidence of any false positives?
+```{r run_stan_5 , echo=FALSE}
+
+
+stan_data <-   list( n_pre = 401 , pos_pre =0 , n_sample= 1500 , pos_pos = 25 , prior_prev = c(0,1))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 4,
+                      iter = 5000, seed = 213123)
+
+```
+
+```{r print_5}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+
+
+
+
+What if we have no evidence of any false positives?
+```{r run_stan_5 , echo=FALSE}
+
+
+stan_data <-   list( n_pre = 401 , pos_pre =0 , n_sample= 3330 , pos_pos = 50 , prior_prev = c(0,1))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_bin_antibody <- stan("model_binomial_antibody.stan", data = stan_data, chains = 2,
+                      iter = 5000, seed = 923474)
+```
+
+```{r print_5}
+print(stanfit_bin_antibody , digits=4)
+
+pairs(stanfit_bin_antibody, pars=c("mu","gamma"))
+```
+trying out this in class problem
+```{r}
+outcomes = tibble(treatment = c("HC","HC_AZ","None") ,                   
+                  death = c(27,25,18) ,                  
+                  discharge = c(70,88,140) ,                  
+                  coded_treatment = c(1,2,3))
+
+ 
+```
+
+

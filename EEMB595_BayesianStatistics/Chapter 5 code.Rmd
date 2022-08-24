@@ -1,0 +1,496 @@
+---
+title: "Chapter 5 Code"
+author: "Stephen R. Proulx"
+date: "4/16/2020"
+output: html_document
+---
+
+Week 4 Lecture on April 22
+
+
+multivariate regression models allow you to ask 'is the effect of predictor 1 related to predictor 2, do they have an effect on the data?`
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(brms)
+
+library(rethinking)
+```
+
+## from 5.1 fitting data with multiple possible predictors
+Load the data on divorce rates by state. Take some time to look at it and get familiear. 
+```{r load_waffle}
+data(WaffleDivorce)
+d <- WaffleDivorce
+```
+
+
+This is the correlation between waffle houses and divorce rate. It isn't super informative, but is none the less a significant effect.
+```{r plot_waffle}
+ 
+  ggplot(d, aes(x = WaffleHouses/Population, y = Divorce))+
+ geom_smooth(method=lm,   se=FALSE)+
+  geom_point(size = 1.5,  alpha = 1/2) +
+  geom_jitter()+
+  scale_x_continuous("Waffle Houses per million", limits = c(0, 55)) +
+  scale_y_continuous("Divorce Rate", limits = c(0, 20)) 
+
+
+```
+
+
+Before continuing we will transform the potential predictor variables be centering them and dividing by their standard deviation.
+```{r standardice_data}
+d <-
+  d %>%
+  mutate(MedianAgeMarriage_s = (MedianAgeMarriage - mean(MedianAgeMarriage)) /
+           sd(MedianAgeMarriage))
+```
+
+
+Throughout this chapter we are going to use BRMS to do the fitting. BRMS writes a stan file and uses the lm style notation which is shared with notation discussed in the book. It makes it relatively easy to fit simple linear and interaction models, but sacrifices some control over exaclty how the model is specified and whether they categorical variables are indexed or not.
+
+
+Here we fit just the median marriage age predictor.
+
+this is a `brm` package which takes input you give it, dataset and description of model and priors, and turns that into (recodes data) into dataframes to be put through a stan program that is then compiled and run by handing the reformed dataframe through that
+- pro: keeps track of naems of columns
+- cons: always does this in the same specific way which may not be compatitable with the dataset you have
+```{r R5.1 , echo=FALSE}
+b5.1 <- 
+  brm(data = d, family = gaussian, # have to give dataset, specify distribution
+      Divorce ~ 1 + MedianAgeMarriage_s, # description of statistical model
+      # divorce is going to be distributed at intercept 1 with given predictor valus of medianage
+      # medianage of marriage have an effect on divorce and there's an intercept
+      prior = c(prior(normal(10, 10), class = Intercept), # prior
+                prior(normal(0, 1), class = b), # prior
+                prior(uniform(0, 10), class = sigma)), # prior, # slope no interaction
+      # good to be explicit about what your priors are
+      iter = 1000,  chains = 4, 
+      seed = 13432)
+
+# specify random effects (i.e. group effects)
+
+```
+
+
+We want to get the likely intervals for the mean divorce rate for each potential level of median marriage (i.e. a counterfactual plot) and overlay it with the actual data. We use the "fitted" fucntion from brms to get the quantiles from the posterior.
+```{r}
+print(b5.1)
+
+# define the range of `MedianAgeMarriage_s` values we'd like to feed into `fitted()`
+nd <- tibble(MedianAgeMarriage_s = seq(from = -3, to = 3.5, length.out = 30))
+
+# now use `fitted()` to get the model-implied trajectories
+f <- 
+  fitted(b5.1, newdata = nd) %>%
+  as_tibble() %>%
+  # tack the `nd` data onto the `fitted()` results
+  bind_cols(nd)
+
+
+# plot using the quantiles for the smooth and the data points for geom_point
+# putting into model medianageofmarriage on center scale, takes parameters ofe ach posterior distribution and calculating normal mean and normal density
+# bounds are 95 CI bounds
+# the data are drawn from normal distribution and not in the mean
+# bounds of parameters, or bounds of posterior predictive fit?
+
+ggplot(data = f, 
+       aes(x = MedianAgeMarriage_s, y = Estimate)) +
+  geom_smooth(aes(ymin = Q2.5, ymax = Q97.5),
+              stat = "identity",
+              fill = "firebrick", color = "firebrick4", alpha = 1/5, size = 1/4) +
+  geom_point(data = d, 
+             aes(y = Divorce), 
+             size = 2, color = "firebrick4") +
+  ylab("Divorce") +
+  theme_bw() +
+  theme(panel.grid = element_blank())    
+```
+
+
+Now do the same with the other potential predictor, marriage rate. We center/normalize the predictor and then fit the model using brms
+```{r}
+d <-
+  d %>%
+  mutate(Marriage_s = (Marriage - mean(Marriage)) / sd(Marriage))
+
+b5.2 <- 
+  brm(data = d, family = gaussian,
+      Divorce ~ 1 + Marriage_s,
+      prior = c(prior(normal(10, 10), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(uniform(0, 10), class = sigma)),
+      iter = 2000, warmup = 500, chains = 4, cores = 4,
+      seed = 5)
+```
+
+
+Now plot the fitted data for marriage rate against the data. This also has a lot of support for ths lope being not 0 (in this case positive) but less than for marriage age.
+```{r}
+print(b5.2)
+
+nd <- tibble(Marriage_s = seq(from = -2.5, to = 3.5, length.out = 30))
+
+f <- 
+  fitted(b5.2, newdata = nd) %>%
+  as_tibble() %>%
+  bind_cols(nd)
+
+# this is same graph as before but its looking at marriage rate
+ggplot(data = f, 
+       aes(x = Marriage_s, y = Estimate)) +
+  geom_smooth(aes(ymin = Q2.5, ymax = Q97.5),
+              stat = "identity",
+              fill = "firebrick", color = "firebrick4", alpha = 1/5, size = 1/4) +
+  geom_point(data = d, 
+             aes(y = Divorce), 
+             size = 2, color = "firebrick4") +
+  ylab("Divorce") +
+  theme_bw() +
+  theme(panel.grid = element_blank())  
+
+```
+
+
+
+Now we'll fit the bivariate model, where both predictors can have independent effects on the divorce rate. Like other languages for linear models, we just "add" the two effects together in the model specification.
+```{r}
+b5.3 <- 
+  brm(data = d, family = gaussian,
+      Divorce ~ 1 + Marriage_s + MedianAgeMarriage_s,
+      prior = c(prior(normal(10, 10), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(uniform(0, 10), class = sigma)),
+      iter = 2000, warmup = 500, chains = 4, cores = 4,
+      seed = 5)
+```
+
+
+plot the fitted values
+```{r R5.5}
+# plotting parameter values at point estimate of ranges
+print(b5.3)
+stanplot(b5.3)
+
+# marraige rate overlaps with 0, is marriagerate itself a good predictor of divorce rate? this multivariate fit says not so much, it overlaps with 0, however the median age maintains this value that is -.69 -.55 (before -1.46 to -), the new range of estiamate effects are higher
+
+# agrument when you incoproate both of these that rate does not show up, median age has an effect
+```
+
+Here is another type of plot, and we will also include the difference between the b slopes for marriage rate and marriage age. If, after all, we are wondering if the effect of one prector is generally larger than the other, then we can just compute the difference between the two for each sample in the posterior and plot it's distribution. We call this b_diff and note that it is mostly positive, meaning that age of marriage generally has a more negative effect than marriage rate. 
+```{r area_plot}
+library(bayesplot)
+# looking at downstream effect
+post <- posterior_samples(b5.3) %>% mutate(b_diff=b_Marriage_s-b_MedianAgeMarriage_s) %>% select(-lp__) # just added to posterior sample `diff` between effect of marraige rate and age to ask if there is some consistent differences
+
+# age and rate overlap alot in this plot despite rate overlaps with 0, but maybe you can;t infer because these 2 parameters overlap with each other (co-variance)
+
+# plot distribution of diff in b_diff
+
+
+mcmc_areas(post,area_method = "equal height",prob=.95)
+
+```
+
+
+
+### from 5.1.3 plotting multivariate posteriors 
+
+Here we just fit the marriage rate and marriage age data in order to have a regression between them to use for determining residuals. Use geom_segment to add a line connecting the regression line to the data points. 
+```{r}
+
+# what can we do with thse posterirs? make residuals plots? hold one parameter constant andv arrying others
+# first need relationship between two parameters
+b5.4 <- 
+  brm(data = d, family = gaussian,
+      Marriage_s ~ 1 + MedianAgeMarriage_s,
+      prior = c(prior(normal(0, 10), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(uniform(0, 10), class = sigma)),
+      iter = 2000, warmup = 500, chains = 4, cores = 4,
+      seed = 5)
+
+
+print(b5.4)
+
+
+f <- 
+  fitted(b5.4) %>%
+  as_tibble() %>%
+  bind_cols(d)
+ 
+
+
+  
+  
+  ggplot(f , aes(x = MedianAgeMarriage_s, y = Marriage_s)) +
+  geom_point(size = 2, shape = 1, color = "firebrick4") +
+  geom_segment(aes(xend = MedianAgeMarriage_s, yend = Estimate), 
+               size = 1/4) +
+  geom_line(aes(y = Estimate), 
+            color = "firebrick4") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+  
+  # given median age of marraige we have an expected value 
+```
+
+
+
+Now we will make plots of residuals vs. divorce rate.The line and intervals are just the normal least squares regression given the residuals.
+```{r}
+# does math for residuals for you
+r <- 
+  residuals(b5.4) %>%
+  # to use this in ggplot2, we need to make it a tibble or data frame
+  as_tibble() %>% 
+  bind_cols(d)
+
+
+# plot
+  ggplot(r, aes(x = Estimate, y = Divorce))+
+    stat_smooth(method = "lm",formula = y ~ x, fullrange = T,
+              color = "firebrick4", fill = "firebrick4", 
+              alpha = 1/5 )  +
+  geom_vline(xintercept = 0, linetype = 2, color = "grey50") +
+  geom_point(  color = "firebrick4", alpha = 2/3) 
+
+# we have rates of marriage from other states that are higher or lower than 
+  # controlled statistically for marraige age, marriage rate has no effect, just a lot of scatter
+```
+
+Now do the converse, fitting marriage age as a function of marriage rate and then plotting residuals.
+```{r}
+
+b5.4b <- 
+  brm(data = d, family = gaussian,
+      MedianAgeMarriage_s ~ 1 + Marriage_s,
+      prior = c(prior(normal(0, 10), class = Intercept),
+                prior(normal(0, 1), class = b),
+                prior(uniform(0, 10), class = sigma)),
+      iter = 2000, warmup = 500, chains = 4, cores = 4,
+      seed = 5)
+
+r <- 
+  residuals(b5.4b) %>%
+  # to use this in ggplot2, we need to make it a tibble or data frame
+  as_tibble() %>% 
+  bind_cols(d)
+
+
+# plot
+  ggplot(r, aes(x = Estimate, y = Divorce))+
+    stat_smooth(method = "lm",formula = y ~ x, fullrange = T,
+              color = "firebrick4", fill = "firebrick4", 
+              alpha = 1/5 )  +
+  geom_vline(xintercept = 0, linetype = 2, color = "grey50") +
+  geom_point(  color = "firebrick4", alpha = 2/3) +
+      scale_x_continuous("Age of marriage residuals", limits = c(-2, 3)) 
+
+```
+
+
+### From 5.1.3.2 These plots show the way that each predictor variable influences both the mean parameters and the total spread of the data, under the model, that we expect to see. The brms functions fitted and predict are similar: fitted uses the posterior samples to get the range of paramter values, while predict uses the posterior samples to get the parmater values and then simulate draws from the distribution. Posterior preditions always show more variance that CI's on the parameters.
+```{r}
+# another way to plot this dta is do counterfactual plots
+# you can choose an value you want and value the rest of them
+# or chose a value you find itneresting
+# we need new data frame to hold the values of the two predictors
+nd <- 
+  tibble(Marriage_s          = seq(from = -3, to = 3, length.out = 30),
+         MedianAgeMarriage_s = mean(d$MedianAgeMarriage_s))
+
+fitted(b5.3, newdata = nd) %>% 
+  as_tibble() %>% 
+  # since `fitted()` and `predict()` name their intervals the same way, 
+  # we'll need to `rename()` them to keep them straight
+  rename(f_ll = Q2.5,
+         f_ul = Q97.5) %>% 
+  # note how we're just nesting the `predict()` code right inside `bind_cols()`
+  bind_cols(
+    predict(b5.3, newdata = nd) %>% 
+      as_tibble() %>% 
+      # since we only need the intervals, we'll use `transmute()` rather than `mutate()`
+      transmute(p_ll = Q2.5,
+                p_ul = Q97.5),
+    # now tack on the `nd` data
+    nd) %>% 
+  
+  # we're finally ready to plot
+  ggplot(aes(x = Marriage_s, y = Estimate)) +
+  geom_ribbon(aes(ymin = p_ll, ymax = p_ul),
+              fill = "firebrick", alpha = 1/5) +
+  geom_smooth(aes(ymin = f_ll, ymax = f_ul),
+              stat = "identity",
+              fill = "firebrick", color = "firebrick4", alpha = 1/5, size = 1/4) +
+  coord_cartesian(xlim = range(d$Marriage_s),
+                  ylim = c(6, 14)) +
+  labs(subtitle = "Counterfactual plot for which\nMedianAgeMarriage_s = 0",
+       y = "Divorce") +
+  theme_bw() +
+  theme(panel.grid = element_blank())  
+
+# dark shaded is parameter mean
+# lighter is sample 
+# varying marriage rate
+
+```
+
+
+
+And the other counterfactual plot
+```{r}
+# new data
+nd <- 
+  tibble(MedianAgeMarriage_s = seq(from = -3, to = 3.5, length.out = 30),
+         Marriage_s          = mean(d$Marriage_s))
+  
+# `fitted()` + `predict()`
+fitted(b5.3, newdata = nd) %>% 
+  as_tibble() %>% 
+  rename(f_ll = Q2.5,
+         f_ul = Q97.5) %>% 
+  bind_cols(
+    predict(b5.3, newdata = nd) %>% 
+      as_tibble() %>% 
+      transmute(p_ll = Q2.5,
+                p_ul = Q97.5),
+    nd
+  ) %>% 
+  
+  # plot
+  ggplot(aes(x = MedianAgeMarriage_s, y = Estimate)) +
+  geom_ribbon(aes(ymin = p_ll, ymax = p_ul),
+              fill = "firebrick", alpha = 1/5) +
+  geom_smooth(aes(ymin = f_ll, ymax = f_ul),
+              stat = "identity",
+              fill = "firebrick", color = "firebrick4", alpha = 1/5, size = 1/4) +
+  coord_cartesian(xlim = range(d$MedianAgeMarriage_s),
+                  ylim = c(6, 14)) +
+  labs(subtitle = "Counterfactual plot for which\nMarriage_s = 0",
+       y = "Divorce") +
+  theme_bw() +
+  theme(panel.grid = element_blank())   
+
+# varrying median marriage age, then we see there are large effects
+# using marriage rate at 0, which is mean of whole population
+# coutnerfactual plots, you can create populations are not like any of the ones you sampled. if your model is giving you a real idea of what is going on, how would popuation s i never saw look? validity of exercise dependi on model your fitting to specific set of paramters that are true for other populations 
+# using model to extrapolate data from other populations you don't know about
+
+```
+
+### from 5.1.3.3 making posterior predictive plots
+Here we actually plot the predicted (using draws of parameters and values from the posterior) values against their observed values.
+```{r}
+fitted(b5.3) %>%
+  as_tibble() %>%
+  bind_cols(d) %>%
+  
+  ggplot(aes(x = Divorce, y = Estimate)) +
+  geom_abline(linetype = 2, color = "grey50", size = .5) +
+  geom_point(size = 1.5, color = "firebrick4", alpha = 3/4) +
+  geom_linerange(aes(ymin = Q2.5, ymax = Q97.5),
+                 size = 1/4, color = "firebrick4") +
+  geom_linerange(aes(ymin = Estimate - Est.Error, 
+                     ymax = Estimate + Est.Error),
+                 size = 1/2, color = "firebrick4") +
+  # Note our use of the dot placeholder, here: https://magrittr.tidyverse.org/reference/pipe.html
+  geom_text(data = . %>% filter(Loc %in% c("ID", "UT")),
+            aes(label = Loc), 
+            hjust = 0, nudge_x = - 0.65) +
+  labs(x = "Observed divorce", 
+       y = "Predicted divorce") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+# plotting observed divorce rate
+# yaxis plot predictive divorce from samples and including 95% CI for parameters + sampling distribution
+# sampling distribution overlaps 1:1 line which is good so model is predicting from data that we use
+# we can use this to make sure our data is matching the model
+# if you see a point that doesn't overlpa, your model is missing something (i.e. high polygamy in ID and UT)
+
+```
+
+
+
+
+
+## From section 5.3.1 on  multicolinearity
+First generate data of left and right legs with total height.
+```{r}
+n <- 100
+set.seed(5)
+
+d <- 
+  tibble(index = seq(1:n) , height    = rnorm(n, mean = 10, sd = 2),
+         leg_prop  = runif(n, min = 0.4, max = 0.5)) %>% 
+  mutate(leg_left  = leg_prop * height + rnorm(n, mean = 0, sd = 0.02),
+         leg_right = leg_prop * height + rnorm(n, mean = 0, sd = 0.02))
+```
+
+
+```{r}
+
+d %>%
+  ggplot(aes(x = leg_left, y = leg_right)) +
+  geom_point(alpha = 1/2, color = "firebrick4") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+```
+
+
+Now fit the data with left and right leg both as predictor variables.
+```{r}
+b5.8 <- 
+  brm(data = d, family = gaussian,
+      height ~ 1 + leg_left + leg_right,
+      prior = c(prior(normal(10, 100), class = Intercept),
+                prior(normal(2, 10), class = b),
+                prior(uniform(0, 10), class = sigma)),
+      iter = 2000, warmup = 500, chains = 4, cores = 4,
+      seed = 5)
+```
+
+How does it look? The posterior distribution shows that the effects of left and right legs are highly negatively correlated. This means that in the set of posetior samples, sometimes left leg length is inferred to have a big effect and other times right leg length.
+```{r}
+post <- posterior_samples(b5.8)
+  
+
+  ggplot( post, aes(x = b_leg_left, y = b_leg_right)) +
+  geom_point(color = "firebrick", alpha = 1/10, size = 1/3) +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+```
+
+But we can make a posterior predictive plot of the data using both leg lengths in this model and it does just fine. 
+```{r}
+
+
+
+post_predictive_data <- predict(b5.8) %>%
+  as_tibble() %>% 
+  bind_cols(d) %>% arrange(height)
+
+
+  
+  
+  ggplot( post_predictive_data, aes( x = height, y = Estimate)) +  
+    geom_point(size = 1.5, color = "firebrick4", alpha = 3/4) +
+      geom_linerange(aes(ymin = Q2.5, ymax = Q97.5),
+                 size = 1/4, color = "firebrick4") +
+  geom_abline(linetype = 2, color = "grey50", size = .5)+     
+  labs(x = "Observed Height", 
+       y = "Predicted Height") +
+  theme_bw()
+  
+  
+  
+  
+```
+
+
+
+

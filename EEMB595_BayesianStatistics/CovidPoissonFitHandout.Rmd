@@ -1,0 +1,214 @@
+---
+title: "Covid Poisson Regression"
+author: "Stephen R. Proulx"
+date: "5/13/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+library(brms)
+library(bayesplot)
+
+```
+
+
+
+
+##NY Times dataset
+The NY Times data on US Counties. Load the data, add a column which is days since January 21. Also loading the package lubridate (which you probably don't have installed) to help converting dates to days since pandemic. 
+
+
+
+```{r setup, include=FALSE}
+library(lubridate)
+
+
+NYTimes_sheet<-read.csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv") 
+
+
+county_data <-  NYTimes_sheet%>%
+  mutate(delta.days=period_to_seconds(days(ymd(date) - ymd(20200121)))/(60*60*24)) %>% #calculate days since data began being collected
+  as_tibble() 
+
+
+maxdays=max(county_data$delta.days)
+
+nyc<- brm(deaths ~ 1 +)
+```
+
+
+To use these data for a Poisson GLM, we have to create a column with a transformed day number, which I call expdays. This transformation makes the first day of the data we are using near 0 and has another parameter controlling the steepness of the exponential transformation. 
+
+Let's check how we have done in SB. Day 55 is a fine place to start, numbers were pretty low before then. 
+```{r}
+
+firstday=55
+expscale = 20 # parameter to use day as linear model transformation 
+SBData <- filter(county_data,delta.days>firstday,county == "Santa Barbara", state=="California") %>%
+  mutate(newcases = cases-lag(cases) , expdays =exp( (delta.days-firstday+1)/expscale)-1 ) %>% 
+  filter(delta.days>56) 
+
+
+ggplot(SBData  , aes(x=delta.days,y=log(newcases, base=10))) +
+  geom_point()+
+    geom_smooth( method = "loess" )+  
+  scale_y_continuous( limits=c(-1,2.5),breaks=c(0,1,2,3), labels=c(1,10,100,1000))+
+  labs( x="days since Jan 22" , y="new cases in SB")
+
+
+
+```
+
+Now pick a region that is closer to linear on the log scale. Say before day 75.
+
+```{r}
+SBData_early<- filter(SBData,delta.days<80) # gave filter
+
+
+ggplot(SBData_early  , aes(x=delta.days,y=log(newcases, base=10))) +
+  geom_point()+
+    geom_smooth( method = "lm" )+  
+  scale_y_continuous( limits=c(-1,2.5),breaks=c(0,1,2), labels=c(1,10,100))+
+  labs( x="days since Jan 22" , y="new cases in SB")
+
+
+
+```
+Let's also look on a non-log scale and see how much variability there really is-
+```{r} 
+ggplot(SBData_early , aes(x=expdays,y=newcases)) +
+  geom_point()+
+    geom_smooth( method = "lm" )+  
+  scale_y_continuous( limits=c(0,50))+
+  labs( x="exp days" , y="new cases")
+```
+
+
+##Johns Hopkins' dataset
+
+This dataset has some other unusual features, like some countries have sub-country data that needs to be collected. 
+```{r}
+
+library(lubridate)
+
+
+confirmed_sheet<-read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv") %>% 
+    select(-Lat, -Long)
+
+
+
+confirmed_long <- gather(confirmed_sheet, -Province.State , -Country.Region , key="date", value = "cases")%>%
+    separate(date,c("x","date.longer"),1,remove=TRUE) %>% 
+    separate(date.longer,c("month","day","year"),remove=TRUE) %>%
+    separate(Province.State,c("location","State"),sep=", ",remove=FALSE) %>% #for US data before 3/10/2020 Province.State value includes sub-state location data. Split this out so that we can recover state level data later.
+    mutate(location = as.character(location)) %>%
+    mutate(State = as.character(State)) %>%
+    mutate(year=as.character(as.numeric(year)+2000)) %>% #data was in a format with just the last two digits for year
+    unite(comb.date, c(month,day,year) , sep=".")%>%  
+    mutate(date = parse_date(comb.date , "%m%.%d%.%Y"))%>%
+    select(-comb.date , -x) %>%
+    mutate(delta.days=period_to_seconds(days(ymd(date) - ymd(20200122)))/(60*60*24)) %>% #calculate days since data began being collected
+    as_tibble()  
+
+
+maxdays=max(confirmed_long$delta.days)-1
+
+
+
+
+USTotals <- filter(confirmed_long,Country.Region=="US" ) %>%  
+    group_by(date, delta.days, Country.Region) %>% summarise(mean=mean(cases), count=n() ) %>%
+    mutate(total.cases = mean*count) %>% 
+    select(-mean, -count)  %>%
+    #  mutate(Country.Region = "USA") %>%
+    rename(cases=total.cases) 
+
+ChinaTotals <- filter(confirmed_long,Country.Region=="China" ) %>%  
+    group_by(date, delta.days, Country.Region) %>% summarise(mean=mean(cases), count=n() ) %>%
+    mutate(total.cases = mean*count) %>% 
+    select(-mean, -count)  %>%
+    mutate(Country.Region = "China") %>%
+    rename(cases=total.cases) 
+
+
+CanadianTotals <- filter(confirmed_long,Country.Region=="Canada" ) %>%  
+    group_by(date, delta.days, Country.Region) %>% summarise(mean=mean(cases), count=n() ) %>%
+    mutate(total.cases = mean*count) %>% 
+    select(-mean, -count)  %>%
+    rename(cases=total.cases) 
+
+confirmed_long2 <- bind_rows(filter(confirmed_long,Country.Region!="Canada",Country.Region!="China",Country.Region!="US"),USTotals,ChinaTotals,CanadianTotals) 
+
+
+
+#make list of countries by most cases
+country_list <- confirmed_long2 %>% filter(delta.days==maxdays) %>% arrange(desc(cases)) %>% select(Country.Region)
+#countries in alphabetical order but only with more than 100 cases
+country_list_alpha <- confirmed_long2 %>% filter(delta.days==maxdays,cases>100) %>% arrange(Country.Region) %>% select(Country.Region)
+
+
+```
+
+```{r fitting brms model to JH data set}
+
+
+brm_model_out <- brm(newcases ~ 1 +expdays, data = filter(confirmed_MAGA, delta.days>50),
+                     family = poisson("log"),
+                     prior = c(prior(normal(3.6, 1), class = Intercept),
+                     prior(normal(0,5), class = b)), 
+                     iter = 1000) # sample_prior = "only"
+
+brm_mo_sf <- as.data.frame(brm_model_out)
+fitted(brm_model_out)
+
+# now plot
+
+fit_df <- data.frame(fitted(brm_model_out, newdata = filter(confirmed_MAGA, delta.days>50)))
+
+
+
+actual_data <- filter(confirmed_MAGA, delta.days>50)
+
+estimate_vs_actual <- data.frame(Estimate = fit_df$Estimate,
+                                 newcases = actual_data$newcases, 
+                                 expdays = actual_data$expdays)
+
+ggplot(data = estimate_vs_actual, aes( y = Estimate, x = newcases)) + geom_point()
+```
+
+Make a US data subset, again picking start and end days and exponential transformation for day.
+```{r}
+firstday=39
+lastday=65
+expscale=5
+    confirmed_MAGA <- filter(confirmed_long2, delta.days>=firstday,delta.days<=lastday,Country.Region =="US" ) %>% 
+  rename(country=Country.Region)%>%
+  select(country,cases,delta.days)%>%
+  arrange(delta.days)%>%
+  mutate(dataset=1, newcases = cases-lag(cases) , expdays =exp( (delta.days-firstday)/expscale)-1 ) %>%
+  filter(delta.days>39)
+
+
+ggplot(confirmed_MAGA  , aes(x=delta.days,y=log(newcases, base=10))) +
+  geom_point()+
+    geom_smooth( method = "lm" )+  
+  scale_y_continuous( limits=c(1,5),breaks=c(1,2,3,4), labels=c(10,100,1000,10000))+
+  labs( x="days since Jan 22" , y="new cases in SB")
+ 
+ggplot(filter(confirmed_MAGA, delta.days>50)  , aes(x=expdays,y=newcases)) +
+  geom_point()+
+    geom_smooth( method = "lm" )+  
+  scale_y_continuous( limits=c(1,30000) )+
+  scale_x_continuous( limits=c(0,200) )+
+  labs( x="days since Jan 22" , y="new cases in SB")
+
+
+```
+

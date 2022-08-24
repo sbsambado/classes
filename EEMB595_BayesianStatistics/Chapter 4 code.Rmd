@@ -1,0 +1,357 @@
+---
+title: "Chapter 4 code"
+author: "Stephen R. Proulx"
+date: "4/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+library(rethinking)
+
+getwd()
+setwd("/Users/samanthasambado/Desktop")
+```
+
+Going through the material in chapter 4. I'll use some of the code from McElreath's book but also do some of it using tidyverse routines. Much of the tidyverse implementation is borrowed from 
+
+```{r loadData}
+data("Howell1")
+d<-Howell1
+d2<- d%>% filter(age>18)
+ggplot(data=d2, aes(x=height)) + geom_histogram(binwidth = 2.5)
+```
+
+```{r priors}
+#plot the priors
+sample_mu<- rnorm(1e5,178,20) # without biasing your model
+sample_sigma <- runif(1e5,0,50)
+prior_h <- rnorm(1e5 , sample_mu,sample_sigma)
+hist(prior_h) # histogram plot
+dens(prior_h) # density function plot, smooth
+
+```
+```{r priors_tidyway}
+n <- 1e4
+
+set.seed(4)
+prior_data <-tibble(sample_mu    = rnorm(n, mean = 178,       sd = 20),
+       sample_sigma = runif(n, min = 0,         max = 50)) %>% 
+  mutate(height          = rnorm(n, mean = sample_mu, sd = sample_sigma))
+  
+  ggplot(prior_data,aes(x = height)) +
+  geom_density(fill = "black", size = 0)
+```
+
+```{r grid_posterior_setup}
+#code to grid out the posterior
+
+n <- 3 # how many steps to use in the grid. Start with 20 then turn it up to 200
+
+d_grid <- # break up possible values of mean and variance, then use that to make grid
+  tibble(mu    = seq(from = 140, to = 160, length.out = n),
+         sigma = seq(from = 4,   to = 9,   length.out = n)) %>% 
+  # expand can be used to combine all the elements from two rows
+  expand(mu, sigma) # takes every possible value of mu and sigma and make every combination of them
+
+#view(d_grid)
+
+n <- 200 # we'll really use this tibble, with 200 steps in each dimension of the grid
+
+d_grid <-
+  tibble(mu    = seq(from = 140, to = 160, length.out = n),
+         sigma = seq(from = 4,   to = 9,   length.out = n)) %>% 
+  # expand can be used to combine all the elements from two rows
+  expand(mu, sigma)
+
+```
+
+```{r grid_posterior_execution}
+post <- d_grid # calculate log likelihood of data, data is the whole list of heights gien the parameters
+post$log_likelihood <- sapply( 1:nrow(post) , function(i) sum(dnorm( # adding up for all heights in pop # when you convert to log form, you can add them together
+  d2$height , 
+  mean=post$mu[i],
+  sd=post$sigma[i],
+  log=TRUE ) ) )
+
+
+post<- post %>% # likelihood times the prior, we don't have to aggregate data across other data frames
+  mutate(prior_mu       = dnorm(mu,    mean = 178, sd  = 20, log = T), # prior for height, norm
+         prior_sigma    = dunif(sigma, min  = 0,   max = 50, log = T)) %>% # prior for sigma, uniform
+  mutate(unstd.posterior        = log_likelihood + prior_mu + prior_sigma) %>% # add up likelihoods
+  mutate(prob    = exp(unstd.posterior - max(unstd.posterior))) # check max vs. min
+# view(post)
+
+# checking each possible pair of parameters, which takes a long time if you do them all, however taking in prior to help us guide random sampling
+# chose finer grids, choose finer approximization
+```
+
+`
+R4.15 and R4.16
+```{r view_posterior}
+# model output
+contour_xyz(post$mu, post$sigma , post$prob, xlab = 'mu', ylab = 'sigma') # contour plot
+# fit of model is consistent with mean of height and sd given in prior data (supportive range)
+image_xyz(post$mu, post$sigma , post$prob, xlab = 'mu', ylab = 'sigma') 
+
+```
+
+
+R4.17
+```{r sample_posterior}
+# here's how to quantify the sampling from posterior distribution
+# looks at grid approx and draws parameter values in proportion to their probability, more likely to draw more, more likely the probability
+
+sample.rows <- sample( 1:nrow(post), size=1e4 , replace = TRUE, prob=post$prob)  
+samples=tibble(mu=post$mu[sample.rows],sigma=post$sigma[sample.rows])
+ggplot(data=samples, aes(x=mu,y=sigma)) + geom_jitter()
+
+# desnity of sigma values
+  ggplot(samples,aes(x = sigma)) +
+  geom_density(fill = "black", size = 0)
+  
+# density of mu values  
+  ggplot(samples,aes(x = mu)) +
+  geom_density(fill = "black", size = 0)
+  
+  quantile(samples$mu,c(.05,.5,.95))
+  
+  
+```
+
+I don't see much advantage to learning the quadratic approximation that McElreath uses. It does have some analogy to traditional statistical approximations, but we won't use it later so I don't recomend spedning too much time on it. You can use the code in the book to do it if you like.
+
+Instead, let's go ahead and use stan. First we will write a very simple stan program and save it. This works best when you can save the stan file in the working directory and then call stan to compile it later. It is possible to pass a stan program direclty to the stan function within R, but since it is a long-ish text file this is usually not the best choice. 
+
+This is a stan program which has just about the minimum amount of complexity to run a real problem. We are hard-coding some of the features of the prior.
+
+UNLIKE IN R, ALL STAN LINES MUST END WITH A ;  
+```{r write_gaussian_stan}
+
+# this is split into 3 blocks (data, parameter, model); this code is to be ran in one go 
+# Stan requires you to have end line with ;
+sink("model_gaussian.stan")
+cat("
+    
+// the data block is where we specify how data will be passed to stan.
+  data { # is specified by number of samples and height
+  int<lower=1> N; // N is the number of samples. It cannot be less than 1, and is an integer.
+  real<lower=0> height[N]; // the data is a vector of length N, they are real numbers, but cannot be negative.
+  }
+// the parameter block is where we specify the parameters that stan will fit. In our previous examples, this would be the 
+// parameters that we make a grid to compute likelihoods over.
+parameters {
+  real  mu; // the mean of height is a real number. It probably shouldn't be negative, but....
+  real <lower=0, upper=50> sigma; // the standard deviation is bounded between 0 and 50, this automatically sets up
+  // a uniform prior between 0 and 50.
+}
+
+// the model block is where likelihoods get calculated. Later, with multi-level models, additional likelihood calculations would go here. The model block also includes priors.
+model {
+# give it our priors
+# look at stan description manual
+mu ~ normal(178,20); // we assume mu is somewhere around 178 
+sigma ~ uniform(0,50); // we did not have to put this here, it is implied from the parameter definition above, but let's be explicit
+# here's the likelihood, we haven't converted to log likelihood, Stan does that
+for( i in 1:N){  
+    height[i] ~ normal(mu,sigma); // finally we calculate the likelihood of each datapoint. We actually could write this without an explicit loop.
+}
+# alternative way to the loop > height ~ norm(mu, sigma);
+
+}
+ 
+    
+    
+    ",fill = TRUE)
+sink()
+
+```
+
+One weakness of stan is that the code you want to run has to be compiled into an executable binary program. This takes time and requires overhead, so it is best to compile it once and then use it a bunch. This command compiles it and gives the executable program a name.
+```{r compile_stan}
+gauss_model <- rstan::stan_model('model_gaussian.stan')
+```
+```{r run_stan}
+
+# we have to prepare some data to pass to stan. It expects a single dataframe, so we package togehter our height vector and our one other parameter, the number of datapoints. 
+stan_data <- c(d2["height"], list(N = length(d2$height)))
+
+# now we are ready to run our first stan program. This will run it with 4 chains for 5000 interations each, which should be plenty
+stanfit_gauss <- sampling(gauss_model, data = stan_data, chains = 4,
+                      iter = 5000, seed = 2131231)
+
+print(stanfit_gauss)
+pairs(stanfit_gauss,pars=c("mu", pars="sigma") )
+
+```
+
+We can use the tools to quantify a posterior sample. Once extracted, you can do anything you like with them!
+R4.32-33
+```{r posterior_samples}
+post <- extract(stanfit_gauss,pars=c("mu","sigma"))
+
+precis(post)
+
+```
+
+
+## 4.4 linear fit models
+
+What do the data look like when we include both weight and height?
+```{r 4.37}
+plot(d2$height ~ d2$weight)
+ggplot( data = d2 , aes(x=weight, y=height)) + geom_point() 
+```
+
+And now we write our next stan program. The additional step is that our predictor mu is now a function of other parameters.
+
+```{r write_stan_linear}
+sink("model_wheight.stan")
+cat("
+    
+  data {
+  int<lower=1> N;
+  real<lower=0> height[N];
+  real weight[N];
+
+}
+parameters {
+  real alpha;
+  real beta;
+  real <lower=0, upper=50> sigma;
+}
+transformed parameters{
+real mu[N]; // introduce our paramter that is a combination of other parameters
+for(i in 1:N){
+  mu[i] = alpha + beta * weight[i];
+  }
+}
+
+model {
+//priors
+alpha ~ normal(178,100);
+beta ~ normal(0,10);
+sigma ~ uniform(0,50);
+for(i in 1:N){
+height[i] ~ normal(mu[i], sigma);
+}
+
+}
+ 
+    
+    
+    ",fill = TRUE)
+sink()
+
+
+linear_model <- stan_model('model_wheight.stan')
+
+
+```
+
+
+```{r run_stan_linear}
+
+stan_data <- c(d2[c("height","weight")], list(N = length(d2$height)))
+
+
+stanfit_linear <- sampling(linear_model, data = stan_data, chains = 4,
+                      iter = 4000, seed = 2131231)
+```
+
+
+We can now look at the output. There can be a lot of it, because stan fit as many mu paramters as we had datapoints and will report them all. But they, on their own, are not really meaningful, it is the parameters of the linear fit model that we are truly interested in.
+```{r print_stan_linear}
+print(stanfit_linear)
+print(stanfit_linear , pars=c("alpha","beta","sigma"))
+pairs(stanfit_linear, pars=c("alpha","beta","sigma"))
+
+```
+
+Let's get back to the chapter, we'll need to extract the samples from the fit and then we can treat them just the same as samples from any other procedure, like McElreath's map.
+R4.40
+```{r extract_linear_fit}
+m4.3 <- extract(stanfit_linear,pars=c("alpha","beta","sigma"))
+
+precis(m4.3)
+```
+
+
+Becasue of the strong correlation between alpha and beta (higher intercepts must mean smaller slopes), we can center the data by transforming it. 
+
+R4.42
+```{r center_data}
+d2 <- 
+  d2 %>%
+  mutate(weight_c = weight - mean(weight))
+```
+
+Now run it again with centered weight, now the paramters are not correlated.
+
+```{r run_stan_linear_centered}
+dcentered=select(d2,-weight) %>% rename(weight=weight_c)
+stan_data <- c(dcentered[c("height","weight")], list(N = length(dcentered$height)))
+
+
+stanfit_linear_centered <- sampling(linear_model, data = stan_data, chains = 4,
+                      iter = 4000, seed = 2131231)
+
+
+ 
+print(stanfit_linear_centered , pars=c("alpha","beta","sigma"))
+pairs(stanfit_linear_centered, pars=c("alpha","beta","sigma"))
+
+```
+
+
+How does our fit look? Plot the data with the fit
+```{r plote_linear_fit}
+
+mean_params <- get_posterior_mean(stanfit_linear , pars=c("alpha","beta"))
+
+  ggplot(d2,aes(x = weight, y = height)) +
+  geom_abline(intercept = mean_params[1,5], 
+              slope     = mean_params[2,5]) +
+  geom_point(shape = 1, size = 2, color = "royalblue") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+
+```
+
+
+We can plot a collection of sampled regression lines as well. This is most similar to figure 4.5 D
+```{r plot_fit_sampled}
+
+
+ ggplot(data =  d2 , 
+         aes(x = weight, y = height)) +
+  geom_abline(intercept = m4.3$alpha[1:20], 
+              slope     = m4.3$beta[1:20],
+              size = 1/3, alpha = .3) +
+  geom_point(shape = 1, size = 2, color = "royalblue") +
+  coord_cartesian(xlim = range(d2$weight),
+                  ylim = range(d2$height)) +
+  labs(subtitle = "N = 10") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+
+```
+
+And some last bits
+
+```{r this}
+mu_at_50 <- m4.3$alpha+m4.3$beta * 50
+dens( mu_at_50, col=rangi2 , lwd=2, xlab="mu|weight=50")
+ 
+
+```
+
+
+
+
+

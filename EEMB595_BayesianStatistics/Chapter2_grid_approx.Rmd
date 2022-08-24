@@ -1,0 +1,53 @@
+---
+title: "Chapter 2 problems"
+author: "Stephen R. Proulx"
+date: "4/4/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## problem 2M1 is to make a grid approximation to estimate the proportion of earth that is land from some new data
+
+Input the data, you could change this by hand, or you could even write some code to simulate it.
+```{r input_date}
+data=tibble(trial = seq(1,6), outcome=c("W","W","L","W","W","W"))
+
+```
+
+```{r grid_likelihood}
+stepsize=0.01
+likelhood_tab <- tibble( proportion_water = seq(0,1,stepsize) , likelihood = 0 )
+ntot=nrow(data)
+nwater = nrow(filter(data,outcome=="W"))
+likelhood_tab<-mutate(likelhood_tab, likelihood=dbinom(nwater,ntot,proportion_water))
+
+
+ggplot( data=likelhood_tab , aes(x=proportion_water,y=likelihood))+
+  geom_point()+
+  theme_bw()+ 
+  theme( axis.text=element_text(family="Helvetica", size=8,angle=90),text=element_text(family="Helvetica", size=12),legend.position = "none")
+        
+
+```
+
+
+```{r add_bayes}
+
+
+likelhood_tab<-mutate(likelhood_tab, prior=round(proportion_water)) %>%
+  mutate( unstd.posterior=prior*likelihood) %>%
+  mutate(posterior = unstd.posterior/sum(unstd.posterior)) %>% view()
+
+
+ggplot( data=likelhood_tab , aes(x=proportion_water,y=posterior))+
+  geom_point()+
+  theme_bw()+ 
+  theme( axis.text=element_text(family="Helvetica", size=8,angle=90),text=element_text(family="Helvetica", size=12),legend.position = "none")
+        
+
+```

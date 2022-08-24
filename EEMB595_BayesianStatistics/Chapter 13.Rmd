@@ -1,0 +1,268 @@
+---
+title: "Chapter 13"
+author: "Stephen R. Proulx"
+date: "5/19/2020"
+output: html_document
+---
+
+```{r setup}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+
+library(rethinking)
+
+```
+
+
+```{r}
+data(reedfrogs)
+d <- as_tibble(reedfrogs)
+d$tank <- 1:nrow(d)
+```
+
+ulam model
+```{r}
+dat <- list(
+  S=d$surv,
+  N= d$density,
+  tank = d$tank)
+
+m13.1 <- ulam(
+  alist(
+    S ~ dbinom( N, p),
+    logit(p) <- a[tank],
+    a[tank] ~ dnorm(0,1.5)
+  ),
+  data=dat, chains=4, log_lik = TRUE
+  )
+```
+
+```{r}
+precis(m13.1 , depth =2)
+```
+
+
+
+## Use brms to fit the models-
+```{r}
+detach(package:rethinking, unload = T)
+library(brms)
+```
+
+
+A brms model for the tanks. Here we fit them all in a single model. We'll compare it to a fit of a subset, and see that it comes out the same because they are all effectively being fit alone.
+
+Note here using the formula  0 + ... gets  brms to not have an intercept tank
+```{r}
+
+d <- mutate(d, tank = as.factor(tank))
+
+
+tadpole_tanks <- brm(surv | trials(density) ~ 0 + tank ,
+                     family = binomial(logit),
+                     data=d,
+                     prior = c(prior(normal(0,1.5), class = b)) )
+```
+
+
+
+```{r}
+print(tadpole_tanks)
+```
+
+```{r}
+tadpole_marginal <- marginal_effects(tadpole_tanks) 
+
+
+plot(tadpole_marginal)[[1]]+
+  ggplot2::scale_y_continuous( limits=c(0,1),breaks=seq(0,1,0.1), labels=seq(0,1,0.1))
+```
+now redo the analysis with just the first 5 tanks, basically we get the same result
+```{r}
+
+d$tank_num <- 1:nrow(d)
+ 
+
+tadpole_tanks_sub <- update(tadpole_tanks,
+                            newdata = filter(d,tank_num<=5))
+
+tadpole_marginal_sub = marginal_effects(tadpole_tanks_sub)
+
+
+
+plot(tadpole_marginal_sub)[[1]]+
+  ggplot2::scale_y_continuous( limits=c(0,1),breaks=seq(0,1,0.1), labels=seq(0,1,0.1))
+```
+
+## Simulating the data and showing advantage of partial pooling
+Side note: using ulam from here on out, I updated some packages and broke part of tidyverse and brms...
+
+Define the parameters to use in this simulation
+```{r}
+## R code 13.7
+a_bar <- 1.5
+sigma <- 1.5
+nponds <- 60
+Ni <- as.integer( rep( c(5,10,25,35) , each=15 ) )
+```
+
+Choose the "actual" binomial parameter for each pond
+```{r}
+## R code 13.8
+set.seed(5005)
+a_pond <- rnorm( nponds , mean=a_bar , sd=sigma )
+ 
+```
+
+
+```{r}
+## R code 13.9
+dsim <- tibble( pond=1:nponds , Ni=Ni , true_a=a_pond )  
+ 
+## R code 13.11
+dsim$Si <- rbinom( nponds , prob=logistic(dsim$true_a) , size=dsim$Ni )
+```
+
+
+Put in the no pooling estimate, which is the maximum likelihood estimate and is just the actual percentage that survived.
+```{r}
+## R code 13.12
+dsim$p_nopool <- dsim$Si / dsim$Ni
+```
+
+
+Run the mutli-level model.
+```{r}
+## R code 13.13
+dat <- list( Si=dsim$Si , Ni=dsim$Ni , pond=dsim$pond )
+m13.3 <- ulam(
+    alist(
+        Si ~ dbinom( Ni , p ),
+        logit(p) <- a_pond[pond],
+        a_pond[pond] ~ dnorm( a_bar , sigma ),
+        a_bar ~ dnorm( 0 , 1.5 ),
+        sigma ~ dexp( 1 )
+    ), data=dat , chains=4 )
+```
+
+
+```{r}
+## R code 13.14
+
+plot(m13.3 , depth=2)
+
+precis( m13.3 , depth=2 )
+
+```
+
+Extract the samples from the model, convert them to the probability scale, and caclulate the error from true
+```{r}
+## R code 13.15
+post <- extract.samples( m13.3 ) 
+
+dsim$p_partpool <- apply( inv_logit(post$a_pond) , 2 , mean )
+
+## R code 13.16
+dsim$p_true <- inv_logit( dsim$true_a )
+```
+
+
+Take a minute to look at the error.
+```{r}
+view(dsim)
+```
+
+
+add the error measurement and plot
+```{r}
+## R code 13.17
+dsim <- dsim %>%
+  mutate(nopool_error = abs(p_nopool-p_true), partpool_error = abs(p_partpool-p_true))
+
+
+dfline <- 
+  dsim %>%
+  select(Ni, nopool_error:partpool_error) %>%
+  gather(key, value, -Ni) %>%
+  group_by(key, Ni) %>%
+  summarise(mean_error = mean(value)) %>%
+  mutate(x    = c( 1, 16, 31, 46),
+         xend = c(15, 30, 45, 60))
+
+
+ ggplot(dsim,aes(x = pond)) +
+  geom_vline(xintercept = c(15.5, 30.5, 45.4), 
+             color = "white", size = 2/3) +
+  geom_point(aes(y = nopool_error), color = "orange2") +
+  geom_point(aes(y = partpool_error), shape = 1) +
+  geom_segment(data = dfline, 
+               aes(x = x, xend = xend, 
+                   y = mean_error, yend = mean_error),
+               color = rep(c("orange2", "black"), each = 4),
+               linetype = rep(1:2, each = 4)) +
+  scale_x_continuous(breaks = c(1, 10, 20, 30, 40, 50, 60)) +
+  annotate("text", x = c(15 - 7.5, 30 - 7.5, 45 - 7.5, 60 - 7.5), y = .45, 
+           label = c("tiny (5)", "small (10)", "medium (25)", "large (35)")) +
+  labs(y        = "absolute error",
+       x = "pond number")+
+  theme(panel.grid    = element_blank(),
+        plot.subtitle = element_text(size = 10))
+```
+
+Re-run for a new simulation without re-compiling
+```{r}
+## R code 13.20
+a <- 1.5
+sigma <- 1.5
+nponds <- 60
+Ni <- as.integer( rep( c(5,10,25,35) , each=15 ) )
+a_pond <- rnorm( nponds , mean=a , sd=sigma )
+dsim <- data.frame( pond=1:nponds , Ni=Ni , true_a=a_pond )
+dsim$Si <- rbinom( nponds,prob=inv_logit( dsim$true_a ),size=dsim$Ni )
+dsim$p_nopool <- dsim$Si / dsim$Ni
+newdat <- list(Si=dsim$Si,Ni=dsim$Ni,pond=1:nponds)
+m13.3new <- stan( fit=m13.3@stanfit , data=newdat , chains=4 )
+
+post <- extract.samples( m13.3new )
+dsim$p_partpool <- apply( inv_logit(post$a_pond) , 2 , mean )
+dsim$p_true <- inv_logit( dsim$true_a )
+dsim <- dsim %>%
+  mutate(nopool_error = abs(p_nopool-p_true), partpool_error = abs(p_partpool-p_true))
+
+
+dfline <- 
+  dsim %>%
+  select(Ni, nopool_error:partpool_error) %>%
+  gather(key, value, -Ni) %>%
+  group_by(key, Ni) %>%
+  summarise(mean_error = mean(value)) %>%
+  mutate(x    = c( 1, 16, 31, 46),
+         xend = c(15, 30, 45, 60))
+
+
+ ggplot(dsim,aes(x = pond)) +
+  geom_vline(xintercept = c(15.5, 30.5, 45.4), 
+             color = "white", size = 2/3) +
+  geom_point(aes(y = nopool_error), color = "orange2") +
+  geom_point(aes(y = partpool_error), shape = 1) +
+  geom_segment(data = dfline, 
+               aes(x = x, xend = xend, 
+                   y = mean_error, yend = mean_error),
+               color = rep(c("orange2", "black"), each = 4),
+               linetype = rep(1:2, each = 4)) +
+  scale_x_continuous(breaks = c(1, 10, 20, 30, 40, 50, 60)) +
+  annotate("text", x = c(15 - 7.5, 30 - 7.5, 45 - 7.5, 60 - 7.5), y = .45, 
+           label = c("tiny (5)", "small (10)", "medium (25)", "large (35)")) +
+  labs(y        = "absolute error",
+       x = "pond number")+
+  theme(panel.grid    = element_blank(),
+        plot.subtitle = element_text(size = 10))
+```
+
+
+
