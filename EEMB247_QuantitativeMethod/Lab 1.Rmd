@@ -1,0 +1,369 @@
+---
+title: "Intro to R and ODEs"
+author: "sbsambado"
+date: "3/21/2020"
+output: html_document
+---
+Coursework for 1/18/2020
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Basic R commands
+```{r}
+## Vectors ##
+
+#vector is a 1D array of numbers
+x <- c(1,5,7)
+x
+
+# : used to generate a sequence of numbers
+x<- 1:10
+x
+
+# replicate/repeat
+# rep(vector, replication)
+rep(1:3,2)
+
+# repeat numbers sequentially
+rep(1:3, c(2,2,2))
+
+# y is scalar added to each element of x
+x<-c(1:10)
+y<-2
+x+y
+
+# multiplication of two vectors
+x <-c(2,4,7)
+y <-c(1,2,3)
+x*y
+
+# logical operators 
+a =c(TRUE,TRUE,FALSE)
+b =c(TRUE,TRUE,TRUE)
+a&b
+
+#length of vector
+length(a)
+
+# [] used to indenitfy elements of vectors
+x[1] #first element of x
+x[length(x)] # last element of x
+
+# exclude elements of a vector
+a <- c(5,7,9,8)
+b <- a[-2]
+b
+
+# logical expresions, when expression is TRUE
+x[x<5] # gives which instances are < 5 in vector x
+x<5 # gives TRUE/FALSE
+
+## Arrays and Matrices ##
+
+# arrays and matrices are not 1D, they have dimensions
+
+# dim() retrieve or set the dimensions of an object
+x <- c(1:10)
+x
+dim(x) # NULL cause it's a vector
+
+dim(x) <- c(1,10) # row,column
+x
+
+# Array
+
+x <- array(1:20, dim = c(4,5))
+x
+
+# Matrices
+# Matrices are arrayas with only 2 dimensions. Need to provide a vectir containing elements of the matrx, specify either number of row/columns of matrix
+M <- matrix(1:6, nrow = 2)
+M
+
+M <- matrix(1:6, ncol = 3)
+M
+
+# typically fills matrix column by column
+# if you want to fill matrix row by row
+M <- matrix(1:6, ncol = 3, byrow = TRUE)
+M
+
+# to obtain the transpose of matrix (i.e. flip it)
+t(M)
+
+# add/subtract two matrices/vectors which have same # of rows/columns
+A <- matrix(1:9, ncol = 3)
+B <- matrix(c(5,2,1,4,7,2,8,9,3), ncol = 3)
+
+A + B
+A - B
+
+# multiply two matrixes with compatible dimensions
+# %*% matrix multiplication operator
+A %*% B
+
+# just * doesn't multiply the same way
+A * B
+
+# multiple two vectors to get their scalar (inner) product, we use the same %*% operator
+a <- c(1,4,7,2)
+b <- c(3,1,2,0)
+a%*%b
+
+# create identity matrix for a desired dimension
+I <-diag(5)
+I
+
+# find determinant of sqaure matrix M, use determinant function det(M)
+M <- c(2,1,1,2)
+dim(M) <- c(2,2)
+M
+det(M)
+
+# to obtain the inverse of M ^-1 of an invertible square matrix M, we use to the solve function, solve(M)
+Minv <- solve(M)
+Minv
+
+# matrix multiplied by its inverse should equal the Identity matrix
+M %*% Minv
+
+# if matrix is singular (not invertible)
+S <- c(1,2,2,4)
+dim(S) <- c(2,2)
+S
+
+det(S)
+
+# to get eigenvalues and eigenvectors of a matrix M, use eigen(M)
+M <- c(2,1,1,2)
+dim(M) <- c(2,2)
+eigen(M)
+```
+
+Functions in R
+```{r}
+# mean of an array
+mean(1:8)
+
+# sum
+sum(c(4,5,2,3))
+
+# function(argument)
+
+## Defining a function
+
+# generalized format
+
+#myfun <- function(x, y, z) { # x,y,z are arguments
+  #expression 1 # expressions are what you do to arguments
+  #expression 2
+  #expression n
+  #output or return() or list() # last line what you want out of function 
+# more than 1 object/number = list()
+# returning something from middle of a function = return()
+#}
+
+# example
+
+fahr_to_kelvin <- function(temp) {
+  kelvin <- ((temp - 32) * (5/9)) + 273.15
+  return(kelvin)
+}
+
+# 1. define 'fahr_to_kelvin' by assignining to the output of function
+# 2. list of arguments within parantheses (temp)
+# 3. { body of function}
+# 4. {return statment to send a result back}
+```
+
+Numerical colutions to continuous-time systems, Ordinary Differential Equations (ODEs)
+```{r}
+# need deSolve package
+library(deSolve)
+
+# use lsoda function in deSolve package
+# lsoda solves initial value problems for (non) stiff of first-order ODEs
+  # this means that we are supplying the state of the system at some point in time (e.g. initial conditoins at t = 0) and use equations that include only first derivatives (e.g. dS/dt)
+
+# Two steps in obtaining numerical solutions to differential equations
+
+  # step 1: write a function 'func' that calculates right hand side of differential euqations. 'func' must take as its first three argumetns the current time, current values of state variables, and vector containing the parameters values. It must also return a list whose elements the right hand sides of ODEs
+    # func(t, y, vector) { list(item1, item2)}
+
+# step 2: use lsoda to solve the system of ODEs
+
+## Connuous-time SIR model ##
+
+# 3 state varables (S, I, R)
+# 2 parameters (beta, gamma)
+# ODEs describes rate of change of state variables
+
+# Step 1. Write function (time, statevariables, vector/params)
+
+SIR.model <- function(t, x, params) {
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  
+  dSdt = - beta*S*I
+  dIdt = beta*S*I - gamma*I
+  dRdt = gamma*I
+  
+  return(list(c(dSdt, dIdt, dRdt)))
+}
+
+# Step 2. Use lsoda function to use our SIR.model over in time to calculate numerical solution to the system of ODEs
+
+# giving calculations at time = 5
+current_time = 5 
+current_state = c(1,2,3)
+my_parameters = c(0.1,2)
+
+SIR.model(current_time, current_state, my_parameters)
+
+# giving calculations over time using lsoda
+
+# lsoda(initial_values, times, function, parameters)
+
+S0 = 99
+I0 = 1
+R0 = 0
+initial_values = c(S0, I0, R0)
+
+beta = 0.1 # per host per week
+gamma = 1 # per week
+parameters = c(beta, gamma)
+
+# method uses adaptive time step
+times = seq(0,5, by = 0.01)
+
+results = lsoda(initial_values, times, SIR.model, parameters)
+# name columns for easy identification
+colnames(results) = c('time', 'S', 'I', 'R')
+
+head(results)
+
+# plot results with R's base plot
+plot(results[, 'time'], results[,'S'], type = 'l', col = 'blue', xlab = 'time', ylab = 'Host density', ylim = c(0, S0 +1))
+lines(results[, 'time'], results[,'I'], col = 'red')
+lines(results[, 'time'], results[,'R'], col = 'green')
+legend('topright', legend = c('S', 'I', 'R', fill = c('blue', 'red', 'green')))
+
+# plot in ggplot
+#library(ggplot2)
+ggplot(data = NULL, aes( x = results[,'time'], y = results[,'S'], color = 'S')) + geom_line() +
+  geom_line(data = NULL, aes( x = results[,'time'], y = results[,'I'], color = 'I')) +
+  geom_line(data = NULL, aes( x = results[,'time'], y = results[,'R'], color = 'R')) +
+  xlab('time (weeks)') + ylab('Host Density')
+
+
+# to store output as a dataframe
+initial_values = c(S = S0, I = I0, R = R0)
+results = as.data.frame(lsoda(initial_values, times, SIR.model, parameters))
+head(results)
+```
+
+Calculating R0
+
+density-dependent transmission
+```{r}
+# density-dependent transmission (gamma/beta = threshold density for pathogen invasion)
+
+# deterministic version of the model, S never equals 0 but gets really small
+# larger initial density of susceptible hosts, greater of fraction of hosts that become infected
+# chain of transmission eventually breaks due to decline in infectives, not due to complete lack of susceptibles "epidemic burnout"
+
+# illustrate this with a for loop
+
+Tend = 100 # end time for simulations
+times = seq(0, Tend, by = 1)
+
+beta = 0.1
+gamma = 1
+parameters = c(beta, gamma)
+
+# initial values
+I0 = 1
+R0 = 0
+
+S0_all <- seq(1, 50, 0.1) # use a sequence of values for S0
+
+S_longterm = rep(0, length(S0_all))
+I_longterm = rep(0, length(S0_all))
+R_longterm = rep(0, length(S0_all))
+
+for (i in 1:length(S0_all)) { # loop through all values of S0
+  initial_values = c(S0_all[i], I0, R0) # initial values of state variables
+  
+  results = lsoda(initial_values, times, SIR.model, parameters)
+  
+  # save only the final values of state variable
+  S_longterm[i] = results[Tend+ 1,2]
+  I_longterm[i] = results[Tend+ 1,3]
+  R_longterm[i] = results[Tend+ 1,4]
+}
+
+# plot final vs. initial number of susceptibles
+plot(S0_all, S_longterm, type = 'l', xlab = 'Initial density of Susceptibles, S0', ylab = 'density of susceptibles remaining',ylim = c(0,10))
+lines(S0_all, S0_all, type = 'l', lty = 2, col = 'blue')
+abline(v = gamma/beta, col = 'red')
+
+# blue line has slope of 1, red line is threshold density of susceptibles for pathogen invasion
+
+
+# plot fraction of susceptibles that survive as a function of the initial density of susceptibles
+
+frac_susceptible = S_longterm/S0_all
+
+plot(S0_all, frac_susceptible, type = 'l', xlab = 'initial density of Susceptibles', ylab = 'fraction of susceptibles remaining')
+
+
+```
+
+Frequency-dependent transmission
+```{r}
+# for frequency dependent transmission, force of infectoin is proportional to the fraction of infected individuals
+
+SIR.freqdep.model <- function(t, x, params) {
+  S = x[1]
+  I = x[2]
+  R = x[3]
+  beta = params[1]
+  gamma = params[2]
+  
+  N = S + I +R
+  
+  dSdt = -beta*S*I/N
+  dIdt = beta*S*I/N - gamma*I
+  dRdt = gamma*I
+  
+  return(list(c(dSdt, dIdt, dRdt)))
+}
+
+S0 = 100
+I0 = 1
+R0 = 0
+initial_values = c(S = S0, I = I0, R = R0)
+
+beta = 3
+gamma = 1
+parameters = c(beta, gamma)
+
+times = seq(0, 5, by = 0.01)
+
+results.freqdep = as.data.frame(lsoda(initial_values, times, SIR.freqdep.model, parameters))
+colnames(results.freqdep) = c('time', 'S', 'I', 'R')
+
+plot(x = results.freqdep$time, y = results.freqdep$S, type = 'l', lwd = 2, xlab = 'time(weeks)', ylab = 'host density')
+lines(x = results.freqdep$time, y = results.freqdep$I, col = 'green')
+lines(x = results.freqdep$time, y = results.freqdep$R, col = 'blue')
+legend('topright', legend = c('S', 'I', 'R'), lwd = 2, col = c('black', 'green', 'blue'), horiz = TRUE, cex = 0.7)
+
+# there is no threshold density for pathogen invation for frequency-dependent transmission
+
+```
+

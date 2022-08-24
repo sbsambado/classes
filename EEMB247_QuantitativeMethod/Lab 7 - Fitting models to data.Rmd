@@ -1,0 +1,465 @@
+---
+title: "Lab  7 - Fitting models to data"
+author: "sbsambado"
+date: "3/25/2020"
+output: html_document
+---
+
+EEMB247: Computer lab 7: Fitting models to data
+
+library(readr)
+library(deSolve)
+library(ggplot2)
+library(bbmle)
+library(MASS)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+flu <- read_csv("~/Desktop/Classes/EEMB 247/Week 8 - Fitting models to data/boarding_school_flu.csv")
+
+ggplot(flu, aes(x = day, y = flu)) + geom_point() + geom_line()
+```
+
+SIBR model
+
+Assume force of infection (i.e. the per capita rate at which a susceptible individual transitions to infected) is equal to beta(1/N) where N is total, fixed, population size. This corresponds to frequency-dependent transmission in which we assumt tat the average number of contacts per individual is constant
+```{r}
+sibr_model = function(time, state_vars, params) {
+  S = state_vars[1]
+  I = state_vars[2]
+  B = state_vars[3]
+  R = state_vars[4]
+  
+  beta = params['beta']
+  gamma = params['gamma']
+  delta = params['delta']
+  N = 763
+  
+  dS = -beta*S*(I/N)
+  dI = beta*S*(I/N) - gamma*I
+  dB = gamma*I - delta*B
+  dR = delta*B
+  
+  updated_state_vars = c(dS, dI, dB, dR)
+  
+  return(list(updated_state_vars))
+}
+```
+
+```{r}
+params = c(beta = 2, gamma = 1/3, delta = 1/3)
+xinit = c(S = 762, I = 1, B = 0, R = 0)
+
+times = seq(0, 15, by = 1/4)
+ode_res = as.data.frame(ode(xinit, times, sibr_model, params))
+
+ggplot(ode_res, aes(x = time, y = I, color = 'I')) +
+  geom_line() + geom_line(aes(x = time, y = B, color = 'B')) +
+  geom_line(data = flu, aes(x = day, y = flu, color = 'data')) +
+  xlab('Days') + ylab('Number of hosts')
+
+```
+
+Fitting the SIBR model to data with trajectory matching
+
+Process error vs. measurement error
+```{r}
+time_steps = 100
+a = 2
+b = 0.9
+X_init = 2
+
+# Array to hold results
+X_det = array(NA, dim = time_steps + 1)
+X_det[1] = X_init
+
+for(t in 2:(time_steps + 1)) {
+  X_det[t] = a + b * X_det[t - 1]
+}
+
+time = 1:(time_steps + 1)
+plot(time, X_det, type = 'l', ylim = c(0,25))
+```
+
+Pure [measurement error] assumes that there is an underlying deterministic model, but each observation is observed with some error
+```{r}
+time_steps = 100
+
+a = 2
+b = 0.9
+sigma_obs = 1
+X_init = 2
+
+X_vals = array(NA, dim = time_steps + 1)
+X_obs = array(NA, dim = time_steps + 1)
+X_vals[1] = X_init
+X_obs[1] = X_init + rnorm(1, mean = 0, sd = sigma_obs)
+
+for(t in 2: (time_steps +1 )) {
+  X_vals[t] = a + b * X_vals[t - 1]
+  X_obs[t] = X_vals[t] + rnorm(1, mean = 0, sd = sigma_obs) # add measurement error
+}
+
+time = 1:(time_steps + 1)
+plot(time, X_vals, type = 'l', ylim = c(0,25))
+lines(time, X_obs, col = 'red')
+```
+
+Pure [process error] assumes stochasticity (randomness of some type) i spart of the process and observations are made without error
+```{r}
+# proccess error vs. measurement error
+time_steps = 100
+
+a = 2
+b = 0.9
+sigma_proc = 1 # measurement error
+X_init = 2 # initial X value
+
+X_vals = array(NA, dim = time_steps + 1)
+X_vals[1] = X_init
+
+for(t in 2:(time_steps + 1)){
+  X_vals[t] = a + b *X_vals[t-1] + rnorm(1, mean = 0, sd = sigma_proc) # add process error
+}
+
+time = 1:(time_steps + 1)
+plot(time, X_vals, type = 'l', ylim = c(0,25), col = 'blue')
+lines(time, X_det, col = 'black')
+lines(time, X_obs, col = 'red')
+
+```
+Process error looks different than the model with measurement error. This is because now there is auto-correlation between the process error at time t and model output at time t + h (for h> 0)
+
+
+
+Trajectory matching and least
+
+To identify the best parameter set, find one that minimizes the criteria known as 'sum of sqaured errors' (SSE). 
+  The residual (error) is defined as 'observed data point - data point predicted by the model'
+      1. Define parameter set
+      2. Sse parameter set to simulate model (gives predicted data given our model)
+      3. Compute the residuals/errors for the observed data and the predicted data
+      4. Compute sum of squared residuals
+```{r}
+
+# step 1
+
+params = c(beta = 2, gamma = 1/3, delta = 1/3)
+
+# step 2
+times = c(0, flu$day)
+
+init_vals = c(S = 762, I = 1, B = 0, R = 0)
+
+  # simulate the model
+pred = as.data.frame(ode(y = init_vals, func = sibr_model, parms = params, times = times))
+
+  # extract B from model
+predB = pred$B[2:15]
+
+# step 3
+
+obsB = flu$flu
+  # compute residuals
+errors = obsB - predB
+errors
+
+# step 4 
+
+  # compute sse between observed and predicted
+sse = sum(errors^2)
+print(sse)
+```
+
+Compute sse for sibr model that takes into 2 arguments: a vector or parameters and a data.frame
+```{r}
+
+# have the function return sse for given parameter set and the data
+
+data = flu
+
+sse_sibr = function(params, data) {
+  times = c(0, data$day)
+  init_vals = c(S = 762, I = 1, B = 0, R = 0)
+  pred = as.data.frame(ode(y = init_vals, func = sibr_model, parms = params, times = times))
+  
+  predB = pred$B[2:length(times)] 
+  obsB = data$flu
+  
+  # compute sse
+  
+  sse = sum((obsB - predB)^2)
+  return(sse)
+}
+
+sse_sibr(params, flu)
+```
+
+Minimizing SSE to find best fit parameters
+Finda  combination of beta, gamma, delta that minimizes SSE. Use 'optim' function that implements many different efficient minimization routines. It requires 3 arguments
+  1. params: initial set of parameters to optimize over
+  2. sse_sibr: function to be minimized
+  3. data = flu: Any additional arguments to the function that is being minimized
+      Save the results of 'optim' to 'fit0' which has the following attributes:
+        a. fit0$par gives the set of parameters that minimize the SSE
+        b. fit0$value gives the value of the function corresponding  ot the estimated parameters
+        c. fit0$convergence tells whether the routine coverged (successfully found a minimum). A value of 0 for this means it worked.
+    The first set of parameters isn't always the best. You can re-run optimization procdure, starting at your previous best fit: [fit1<- optim(fit0$par, sse_sibr, data = flu)]
+```{r}
+# find parameter vector that minimizes SSE
+
+fit0 = optim(params, sse_sibr, data = flu)
+
+# 3a
+fit0$par
+
+# 3b
+fit0$value
+
+# 3c
+
+fit0$convergence
+
+
+# re-run the optimization
+fit1 <- optim(fit0$par, sse_sibr, data = flu)
+fit1$par
+
+# now plot resulting dynamics from the parameters that minimize the SSE to se if the results actually make any sense
+
+best_params_lsq = fit1$par
+best_mod_lsq = as.data.frame(ode(times = times, y = init_vals, parms = best_params_lsq, func = sibr_model))
+
+# plot it
+ggplot(best_mod_lsq, aes(x = time, y = B), color = 'best fit') + geom_line() + 
+  geom_line(data = flu, aes(x = day, y = flu, color = 'data'))
+
+```
+SSE assumes measurement error is normally (Gaussian) distributed. However it does not provide a way to get confidence intervals around our predictions. Confience intervals 9CI) are useful if we wanted to calcualte the uncertainty around the predicted R0 in our model. To do this, we need to allow the measurement error to follow some distribution (Normal, poisson, binomial, etc)
+
+Trajectory matching with maximum likelihood
+Specifying a distribution for our measurement error allows us to use maximum likelihood to dir the model. Likelihood is defined as ' the likelihood of a set of parameters given the data'. Similar to SSE, we can say that a parameter set is 'better' if it has a higher likelihood than another parameter set, given the data.
+
+We can find the 'best' parameter set for our data by findig the parameter set that maximizes the likelihood given the data
+```{r}
+set.seed(3)
+mu = 5
+sigma = 2
+
+# rnorm draws a random number from a normal distribution with some mean and sd
+
+data = mu + rnorm(100, mean = 0, sd = sigma)
+plot(data, ylab = 'data', xlab = 'time', type = 'l')
+
+# compute the likelihood prod is a function that takes a product of a vector
+
+likelihood = prod(dnorm(data, mean = mu, sd = sigma))
+likelihood
+ # ^ this number is really small. That's okay but its more convenient to work with negative log-likelihood. Take the negative log of eadh side of the likelihood equation
+
+ # compute negative log-likelihood (nll)
+
+
+negative_ll = -1*sum(dnorm(data, mean = mu, sd = sigma, log = T))
+negative_ll
+
+  # want to find a parameter, u, that maximizes the likelihood given sigma = 2
+
+# let's try a bunch of different values of u and seeing which one leads to the smallest negative log-likelihood given the data set
+mu_vals = seq(4,6, length = 1000)
+nlls = array(NA, dim = length(mu_vals))
+
+# loop through all mu values and compute the nll
+
+for(i in 1:length(mu_vals)) {
+  nlls[i] = -1*sum(dnorm(data, mean = mu_vals[i], sd = sigma, log = T))
+}
+
+# more efficient way 
+ nlls_efficient = sapply(mu_vals, function(tmu) - 1*sum(dnorm(data, mean = tmu, sd = sigma, log = T)))
+
+ggplot(data = NULL, aes(x = mu_vals, y = nlls)) + geom_line() +
+  ylab('nll') + xlab('mu')
+
+```
+
+Likelihood in practice to flu data
+Assume poisson distribution which is often used distribution for ocutn data
+```{r}
+# now incorportate poisson-distributed measurement error
+
+best_params_lsq  = fit1$par
+ode_sim = as.data.frame(ode(y = xinit, parms = best_params_lsq, func = sibr_model, times = times))
+
+# add random poisson measurement error
+B_obs = rpois(length(ode_sim$B), ode_sim$B)
+ode_sim$B_obs = B_obs
+
+ggplot(data = ode_sim, aes(x = time, y = B, color = 'true')) + geom_line() +
+  geom_point() + geom_point(aes(x = time, y = B_obs, color = 'with error')) +
+  geom_line(aes(x = time, y = B_obs, color = 'with error'))
+
+
+```
+
+Calculate negative log-likelihood of observed flue data given best fit SSE parameters and poisson measurement error
+```{r}
+
+nll_obs = -1*sum(dpois(flu$flu, ode_sim$B[-1], log = T))
+nll_obs
+
+```
+
+Write generic function that will calculate the negative log-likelihood for a given parameter set
+```{r}
+
+sibr_nll = function(beta, gamma, delta) {
+  times = c(0, flu$day)
+  params = c(beta = beta, gamma = gamma, delta = delta)
+  init_vals = c(S = 762, I = 1, B = 0, R = 0)
+  ode_res = as.data.frame(ode(func = sibr_model,
+                              y = init_vals,
+                              times = times, 
+                              parms = params))
+  
+  nll = -1*sum(dpois(flu$flu, ode_res$B[2:15], log = TRUE))
+  return(nll)
+}
+
+start_params = as.vector(best_params_lsq)
+sibr_nll(start_params[1],
+         start_params[2],
+         start_params[3])
+
+nll_beta = function(par) {
+  return(sibr_nll(beta = par[1], # hold all parameters fixed except for beta
+                  start_params[2],
+                  start_params[3]))
+}
+
+beta_vals = seq(1/3, 10, length = 100) # now vary beta
+beta_nll = sapply(beta_vals, nll_beta)
+ggplot(data = NULL, aes(x = beta_vals, y = beta_nll)) + geom_line()
+
+beta_vals[which.min(beta_nll)]
+
+# so given the fixed values of other parameters, our MLE for beta is around 2.35-2.45
+
+# we can do this more formally using 'optim'
+
+fit_beta = optim(2, nll_beta, method = 'Brent', lower = 2, upper = 3)
+fit_beta
+
+```
+
+Find the conditional MLE of gamma
+```{r}
+
+# use same steps above, fix beta and delta to find MLE of gamma given fixed parameters
+
+nll_gamma = function(par) {
+  return(sibr_nll(beta = start_params[1],
+                  gamma = par[1],
+                  delta = start_params[3]))
+}
+
+fit_gamma = optim(2, nll_gamma, method = 'Brent', lower = 0.7, upper = 1.2)
+
+fit_gamma
+
+
+```
+
+Finding MLEs of multiple parameters simultaneously 
+Want to jointly maximize the likelihood for all parameters simultaneously.  Could use 'optim' but 'mle2' and 'bbmle' package provide additional features
+
+'bbmle' arguments
+  1. sibr_nll : negative log likelihood function that we want to minize
+  2. start: list where named items correspond to parameters in sibr_nll function. Coose starting values that are somewhat close to MLE estimates
+  3. method: specifies minimization routine to use
+  4. lower and upper: vectors that specify lower and upper bounds for parameters you are estimating
+```{r}
+
+library(bbmle)
+
+# get the mle estimates for all parameters
+fit_all =  mle2(sibr_nll,
+                 start = list(beta = start_params[1],
+                              gamma = start_params[2],
+                              delta = start_params[3]),
+                 method = 'L-BFGS-B',
+                 lower = c(0,0,0),
+                 upper = c(Inf, Inf, Inf))
+
+coef(fit_all) # coefficient estimates
+best_params_lsq # least squares estimates
+
+
+sibr_sim = as.data.frame(ode(y = init_vals, parms = fit_all@coef, time = times, func = sibr_model))
+
+ggplot(sibr_sim, aes(x = time, y = B, color = 'sibr')) +
+  geom_line() + geom_line(data = flu, aes(x = day, y = flu, color = 'data'))
+
+pfit = profile(fit_all) # calculate profile likelihood
+confint(pfit)
+```
+
+Using the uncertainty to estimate CIs for dervied statistics
+Can use 'fit_all' to estimate uncertainty around other derived statistics of interest in our model. For R0 (beta/gamma). The MLE estimate of R0 is then.
+```{r}
+R0 = as.numeric(fit_all@coef['beta']/ fit_all@coef['gamma'])
+print(R0)
+
+# what is the uncertainty around this estimate? We use 'fit_all' procides us with a co-variance matrix for our paramters of interest
+covar = fit_all@vcov
+covar
+
+# correlation matrix
+
+S = diag(diag(covar))
+solve(S) %*% fit_all@vcov %*% solve(S)
+```
+
+With this co-variance matrix, we can use brute force simulation to get the uncertainty around R0.
+
+The brute force simulation has 4 steps
+  1. assume that the parameter estimates follow a multivariate normal distribution with the mean being the MLE parameter estimates and the co-variance matrix being the estimated co-variance matrix. This is asymptotically true for all MLE estimates as sample size get large so it is not that crazy of an assumption
+  2. Draw a large number of parameter vectors from this mltivariate distribution
+  3. Calculate the statistic of interest (R0) for all random draws. This gives you a distribution of the statistic
+  4. Compute your dsired quantiles from this distribution
+```{r}
+
+library(MASS)
+
+samps = mvrnorm(1000, mu = fit_all@coef, fit_all@vcov) # sample parameter vector frommultivariate normal distribution
+
+R0_distribution = samps[, 'beta'] / samps[,'gamma'] # compute a distribution of R0
+
+quantile(R0_distribution, c(0.025, 0.5, 0.975)) # get 95% CI for this distribution
+```
+
+Comparing models fit with maximum likelihood
+One way of comparing models is using the Akaike information criterion (AIC) . AIC tries to find a balance between models that fit the data well and models that are relatively simple. This is known bias-variance trade-off that is often discussed in statistcs. Select the lowest AIC score in perferred model.
+
+```{r}
+
+# calculate AIC for our best fit model
+nll = fit_all@min
+k = 3
+AIC = 2*nll + 2*k
+print(AIC)
+
+# more parameters, higher k, higher AIC, less perferred model
+nll = fit_all@min
+k = 5
+AIC = 2*nll + 2*k
+print(AIC)
+
+# OR, use 'AIC' function
+AIC(fit_all)
+```
+

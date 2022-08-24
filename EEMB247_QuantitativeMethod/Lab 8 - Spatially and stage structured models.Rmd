@@ -1,0 +1,170 @@
+---
+title: "Lab 8 - Stage structured and spatially structured models"
+author: "sbsambado"
+date: "3/25/2020"
+output: html_document
+---
+EEMB247 Computer lab 8: Spatially strucutred and stage-structured models
+
+Consider a system with two developmental stages, modeled in continuous time. This could represent a dynamical system in which the entities in the system transition from one state to another
+
+If we model this system of ODEs, in which individuals mature at a constant per individual rate of mj, then the distribution of times psent in J stage will be exponentially-dsitributed, teh average time spent in J stage will be Tj = 1/mj
+```{r}
+
+require(deSolve)
+
+twostage <- function(t, y, parms) {
+  J = y[1]
+  A = y[2]
+  mJ = parms[1]
+  
+  dJdt = -mJ*J
+  dAdt = mJ*J
+  
+  ODEs = c(dJdt, dAdt)
+  list(ODEs)
+}
+
+mJ = 1/10
+pars = c(mJ = mJ)
+
+init = c(J = 100, A = 0)
+
+tInt = seq(0,50, by = 0.1)
+
+Sout = as.data.frame(lsoda(init, times = tInt, func = twostage, parms = pars))
+mat.rate = mJ*Sout$J
+plot(Sout$time, Sout$J, ylim = c(0, 100), type = 'l', col = 'black', lty = 2, lwd = 2,
+     xlab = 'time', ylab = 'densities, and maturation rates')
+lines(Sout$time, Sout$A, lty = 3, lwd = 2, col = 'blue')
+lines(Sout$time, mat.rate, col = 'red')
+legend('right', legend = c('J', 'A', 'mat.rate'), lty = c(2,3,1), lwd = c(2,2,1),
+       col = c('black','blue','red'))
+```
+
+Divide juvenile classes into n = 2 identical substages
+```{r}
+LinChain <- function(t, y, parms) {
+  Nstates = parms[1];
+  m = parms[2];
+  
+  dJdt = rep(0, Nstates)
+  dJdt[1] = - m*Nstates*y[1];
+  
+  if (Nstates > 1)
+    {
+      for(i in 2:Nstates) 
+        {
+           dJdt[i] = m*Nstates*y[i - 1] - m*Nstates*y[i];
+    }
+  }
+      dAdt = m*Nstates*y[Nstates]
+      
+      ODEs <- c(dJdt, dAdt)
+      list(ODEs)
+}
+
+m = 1.0
+Nstates = 5
+
+pars <- c(Nstates = Nstates, m = m)
+init <- c(100, rep(0,Nstates))
+tInt <- seq(0, 10, by = 0.1)
+
+Sout <- lsoda(init, times = tInt, func = LinChain, parms = pars)
+Juvs <- Sout[,2:(Nstates + 1)]
+if (Nstates > 1) {
+  TotJuvs <- rowSums(Juvs)
+} else {
+  TotJuvs <- Sout[,2]
+}
+
+Adults <- Sout[,(Nstates + 2)]
+maturation <- m*Nstates*Sout[,(Nstates + 1)]
+
+par(mar = c(5, 4, 4, 5) + .1)
+plot(tInt, TotJuvs, type = 'l', lty = 2, lwd = 2, xlab = 'time', ylab = 'J,A',
+     ylim = c(0, 100))
+lines(tInt, Adults, lty = 3, lwd = 2, col = 'blue')
+
+par(new = TRUE)
+plot(tInt, maturation, type = 'l', col = 'red', xaxt = 'n', 
+     xlab = '', ylab = '')
+axis(4)
+mtext('mat.rate', side = 4, line = 3)
+
+legend('right', legend = c('J', 'A', 'mat.rate'), lty = c(2,3,1), 
+       col = c('black', 'blue', 'red'))
+
+```
+
+Stage- Structured Host-parasitoid model 
+
+Now the system has a parasitoid (P) that attacks only the J
+```{r}
+
+LinChain <- function(t, y, parms) {
+  Nstates = parms[1]
+  m = parms[2]
+  a = parms[3]
+  dP = parms[4]
+  R = parms[5]
+  dA = parms[6]
+  
+  Adult = y[Nstates + 1]
+    P = y[Nstates + 2]
+    dJdt = rep(0, Nstates)
+    dJdt[1] = R*Adult - m*Nstates*y[1] - a*P*y[1]
+    parasitism = a*P*y[1]
+    
+    if (Nstates > 1) {
+      for (i in 2:Nstates) {
+        dJdt[i] = m*Nstates*y[i - 1] - m*Nstates*y[i] - a*P*y[i];
+        parasitism = parasitism + a*P*y[i];
+      }
+    }
+    dAdt = m*Nstates*y[Nstates] - dA*Adult
+    dPdt = parasitism - dP*P
+    
+    ODEs <- c(dJdt, dAdt, dPdt)
+    list(ODEs)
+}
+
+Nstates = 3
+m = 0.1
+a = 0.1
+dP = 1
+R = 20
+dA = 1.0
+
+pars <- c(Nstates = Nstates, m = m, a = a, dP = dP, R = R, dA = dA)
+
+init <- c(10, rep(0, Nstates), 10)
+tInt <- seq(0, 100, by = 0.1)
+
+Sout <- lsoda(init, times = tInt, func = LinChain, parms = pars)
+Juvs <- Sout[,2:(Nstates + 1)]
+
+if(Nstates > 1) {
+  TotJuvs <- rowSums(Juvs) 
+} else {
+  TotJuvs <- Sout[,2]
+}
+
+Adults <-Sout[,(Nstates +2)]
+P = Sout[,(Nstates + 3)]
+maturation <- m*Nstates*Sout[,(Nstates + 1)]
+
+plot(tInt, TotJuvs, type = 'l', lty = 2, lwd = 2, xlab = 'time', 
+     ylab = 'J, A', ylim = c(0, max(TotJuvs + 10)))
+lines(tInt, Adults, lty = 1, lwd = 2, col = 'blue')
+lines(tInt, P, lty = 1, lwd = 1, col = 'red')
+legend('top', legend =c('J', 'A', 'P'), lty = c(2,1,1), lwd = c(2,2,1),
+       col = c('black', 'blue', 'red'))
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+

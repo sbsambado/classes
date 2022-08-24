@@ -1,0 +1,206 @@
+---
+title: "Lab 2"
+author: "sbsambado"
+date: "3/23/2020"
+output: html_document
+---
+
+EEMB 247 Computer lab 2: More useful things in R, and linear Dynamical systems in continuous time and discrete time
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+A few more useful things in R
+```{r}
+# Logical operators (TRUE, FALSE, NA)
+
+x = 11:18
+x
+y = x < 15
+y
+
+# <= : less than, or equal
+# >= :greater than, or equal
+# != : inequality
+
+# if y and z are logical expressions, then y & z is their intersection 'and', y | z is their union 'or', and !y is the negation of y
+
+x = 1:10
+y = x < 5
+z = x < 7
+
+z
+y & z
+y | z
+
+## Missing values (NA)
+
+# function is.na(x) gives a logical vector of the same size as x with value TRUE if and only if the corresponding element in x is NA
+
+z = c(1:3, NA)
+z
+
+ind = is.na(z)
+ind
+
+# x == NA is different than is.na(x) since NA is a marker for a quantity that is not available
+
+x = c(1:10, NA)
+x
+
+# x == NA
+
+# the second 'missing' values are produced by numerical computation, so-called Not a Number 'NaN' (e.g. 0/0, Inf - Inf)
+
+## Index Vectors; selecting and modifying subsets of a data set
+z = c(1:3, NA)
+z
+
+y = z[!is.na(z)] # removes NA
+y
+
+w = (z + 1)[(!is.na(z)) & z >1] # places values of vector z+1 for which the corresponding value in z was both non-missing and greater than 1
+w
+
+# index vectors can be a vector of positive integers
+x = seq(12, 30)
+x
+x[6] # selects 6th component of x
+x[1:10] # selects first 10 elements of x
+
+# index vectors can be vector of negative integers. These index vector specifies the values to be excluded rather than included.
+y = x[-(1:5)]
+y
+
+# index vectos can be a vector of character strings. Only applies where an object has a 'names' attribute to identify its components. In this case a sub-vector of the names vector may be used in the same way as positive integral labels
+fruit = c(5,10,1,20)
+names(fruit) = c('orange', 'bannana', 'apple', 'peach')
+lunch = fruit[c('apple', 'orange')]
+lunch
+
+# indexed expression can also appear on the receiving end of an assignment, in which case the assignment operation is performed only on those elements of the vector
+
+# replace any missing values in x by zeros
+x = c(1,4, NA, 5, 7, NA, 12)
+x
+
+x[is.na(x)] = 0
+x
+
+# y[y<0] <- -y[y<0] has same effect as: y <- abs(y)
+y = c(-4, 4, 2, -3)
+y
+
+y[y < 0] = -y[y<0]
+y
+
+
+## Conditional expressions
+# conditional expressions allow you to do different things based on the value of a variable
+
+# basic format
+# if (condition) {
+# expression(s) if true
+# } else {
+# expression(s) to do otherwise
+#}
+
+x = 5
+if (x > 3) y = 12
+y
+
+# or
+
+x <- 5
+if (x > 3) {
+  y = 12
+  z = 3
+} else {
+  y = 0
+  z = 200
+}
+y
+```
+Repetitive execution: for loops and avoiding for loops
+```{r}
+# a for loop allows you to loop over values in a vector or list of numbers, and perform some operations over and over again
+# R has a family of functions, the 'apply' family, which can be used to avoid for loops
+  # apply - apply over the margins of an array (rows/columns of a matrix)
+  # lapply - apply over an object and return list
+  # sapply - apply over an object and return a simplified object (an array)
+  # vapply - similar to sapplym but yo specify the type of object returned by the iterations
+    
+    # array = homogeneous elements ; matrix = simple row and column
+# apply function acts on arrays example
+# apply(X, margin, FUN, ...)
+  # X is array or matrix
+  # margin is a variable defining how the function is applied
+      # MARGIN = 1 ; applies over rows
+      # MARGIN = 2 ; applies over columns
+      # MARGIN = c(1,2) applies to rows and columns
+  # FUN is the function you want to apply to the data
+
+X = array(1:20, dim = c(4,5)) # 4 x 5 matrix
+X
+
+apply(X, 2, sum) # sum of columns in matrix, X
+apply(X, 1, mean) # mean of rows in matrix, X
+
+# loops in R are slow
+  # 1. don't use a loop when a vectorized alternative exists
+  # 2. don't grow objects (via c, cbind, etc.) during the loop
+  # 3. Allocate an object to hold the results and fill it in during loop
+
+## BASIC STRUCTURE OF FOR LOOP ##
+
+# for (variable in vector) {
+#   expression(s)
+# }
+
+# want to add 5 to each element in vector x and store it in y
+x = c(1,3,2,4,5,7,9,0,3)
+y = rep(0, length(x))
+
+for (i in 1:length(x)) {
+  y[i] = x[i] + 5
+}
+y
+
+# however, this could be expediated
+y = x +5
+y
+
+# allocate an object y to hold the answer
+y = rep(0, length(x) - 1)
+
+for (i in length(x) - 1) {
+  y[i] = x[i] + x[i+1]
+}
+y
+```
+
+Numerical solutions to discrete time models using for loops
+```{r}
+# for discrete time equations, we can obtain numerical solutions to discrete-time difference equations using for loops
+
+R = 2.5
+initial_N = 0.3
+max_time = 20
+
+N = rep(0, max_time + 1)
+N[1] = initial_N
+for (t in 1:max_time) {
+  N[t+1] = R*N[t]*(1 - N[t])
+}
+
+times = seq(0, max_time)
+plot(times, N, type = 'b', xlab = 'time', ylab = 'N')
+
+```
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

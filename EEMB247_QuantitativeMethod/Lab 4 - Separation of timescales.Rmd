@@ -1,0 +1,335 @@
+---
+title: "Week 5 - Separatio of timescales"
+author: "sbsambado"
+date: "3/24/2020"
+output: html_document
+---
+
+Computer lab 4: Local stability analysis, separation of time scales, plus R tutorial on the basics of graphing in R
+```{r}
+#library(deSolve)
+#library(rootSolve)
+```
+
+Local stability analysis
+
+3 steps to perform local stability analysis to determine whether an equilibrium is locally stable:
+  1. Calculate the equilibrium
+  2. Use Taylor's theorem to linearize the differential equation near equilibrium
+  3. Solve the linear differential equations describing the dynamics of a small perturbations from equilibrium
+```{r}
+# Use R to determine numerically whether an equilibrium is locally stable
+
+# rootSolve package has 'jacobian.full' function that generates the Jacobian matrix for right hand side of a set of ordinary differential equations
+# from the Jacobian matrix we can determine whether or not the equilibrium is locally stable by calculating the eigenvalues of this matrix
+# for continuous-time model, the equilibrium will be locally stable if the real parts of all of the eigenvalues are negative
+# syntax for 'jacobian.full' : jacobian.full(y, func, parms, ...)
+  # y is state variable values at which the Jacobian is estimated
+  # func is function specifying the ODEs
+  # parms is the parameter vector
+
+# calculate equilibrium using multiroot
+
+PredPrey_eqm <- function(x, parms) {
+  N = x[1]
+  P = x[2]
+  I_N = parms[1]
+  dN = parms[2]
+  a = parms[3]
+  c = parms[4]
+  dP = parms[5]
+  
+  c(F1 = I_N - dN*N - a*N*P,
+    F2 = c*a*N*P - dP*P)
+}
+
+# function returning the gradients for the model (used in Jacobian.full)
+PredPrey <- function(t, state, parameters) {
+  N = state[1]
+  P = state[2]
+  
+  I_N = parameters[1]
+  dN = parameters[2]
+  a = parameters[3]
+  c = parameters[4]
+  dP = parameters[5]
+ 
+  # rate of change
+  dNdt = I_N - dN*N - a*N*P
+  dPdt = c*a*N*P - dP*P 
+  
+  # return the rate of change
+  list(c(dNdt, dPdt))
+}
+
+I_N = 10
+dN = 0.2
+a = 0.01
+c = 0.5
+dP = 0.1
+parameters <- c(I_N, dN, a, c, dP)
+
+initN = 10
+initP = 10
+x = c(N = 10, P = 10)
+
+# call multiroot
+eqm = multiroot(PredPrey_eqm, x, parms = parameters)
+# equilirbium values are stored in the root part of eqm
+eqm$root
+
+# Numerically calculate the jacobian matrix at equilibrium
+JAC = jacobian.full(y = c(eqm$root), func = PredPrey, parms = parameters)
+
+# use 'eigen' to calculate the eigenvalues of this matrix
+# if all real parts of the eigenvalues are negative, the equilibrium is locally stable
+eigs = eigen(JAC)
+eigs
+
+# these results give us 2 eigenvalues and their corresponding right eigenvectors of the Jacobian matrix
+# this case gives us real, negative eigenvalues, so small perturnations from equilibrium should return exponentially equilibrium
+
+# the 'Re()' function returns the real part of a number, so in cases in which eigenvalues are complex numbers, we calculate the maximum of the ral parts of the eigenvalues using this command
+max(Re(eigs$values))
+
+# pred-prey example is boring because equlibrium is always positive
+# Let's look at another model where the equilibrium can be positive/negative depending on choice of parameters (i.e. The Brusselator, an oscillatory chemical raction network)
+
+# function returning the gradients for the model (used 'jacobian.full')
+Brusselator = function(t, state, parameters) {
+  x = state[1]
+  y = state[2]
+  k1 = parameters[1]
+  k2 = parameters[2]
+  k3 = parameters[3]
+  k4 = parameters[4]
+  
+  dxdt = k1 - k2*x + k3*x^2*y - k4*x
+  dydt = k2*x - k3*x^2*y
+  
+  list(c(dxdt, dydt))
+  
+  # specify values of parameters
+  k2 = 2
+  k3 = 0.5
+  k4 = 1
+  # let's try a value for 
+  k1 = 2
+  
+  parameters = c(k1, k2, k3, k4)
+  
+  # we can calculate the equilibrium values for this system analytically
+  x_eqm = k1/k4
+  y_eqm = (k2*k4)/(k1*k3)
+  
+  # Numerically calculate the jacobian matrix at the equilibrium
+  JAC = jacobian.full(y = c(x_eqm, y_eqm), func = Brusselator, parms = parameters)
+  JAC
+}
+
+eigs = eigen(JAC)
+eigs
+max(Re(eigs$values))
+```
+
+Calculating stability boundaries, numerically
+```{r}
+# function returning the gradients for the model (used in jacobian.full)
+
+max_eig_Brusselator = function(x, k2, k3, k4) {
+  k1 = x
+  x_eqm = k1/k4
+  y_eqm = (k2*k4)/(k1*k3)
+  
+  A11 = k2 - k4
+  A12 = k3*x_eqm^2
+  A21 = -k2
+  A22 = -k3*x_eqm^2
+  A = matrix(c(A11, A12, A21, A22), nrow = 2, ncol = 2, byrow = TRUE)
+
+  eigs = eigen(A)
+  
+  max(Re(eigs$values))
+}
+
+myroot = uniroot(max_eig_Brusselator, c(1,2), k2 = k2, k3 = k3, k4 = k4)
+
+print("boundary for stability")
+
+myroot$root
+
+# we can make a 2D plot of stability boundary calculating the value of k1 dividing the stable and unstable regions for a range of values of some other parameters
+# plot stability boundary on the k2 and k1
+
+# function returning the gradients for the model (used in jacobian.full)
+max_eig_Brusselator = function(x, k2, k3, k4) {
+  k1 = x
+  x_eqm = k1/k4
+  y_eqm = (k2*k4)/(k1*k3)
+  
+  A11 = k2 - k4
+  A12 = k3*x_eqm^2
+  A21 = -k2
+  A22 = -k3*x_eqm^2
+  A = matrix(c(A11, A12, A21, A22), nrow = 2, ncol = 2, byrow = TRUE)
+
+  eigs= eigen(A)
+  max(Re(eigs$values))
+}
+
+k3 = 0.5
+k4 = 1
+
+k2_values = seq(1, 10, 0.01)
+k1_boundary = rep(0, length(k2_values))
+i = 0
+for (k2 in k2_values) {
+  i = i + 1
+  myroot = uniroot(max_eig_Brusselator, c(0,10), k2 = k2, k3 = k3, k4 = k4)
+  k1_boundary[i] = myroot$root
+}
+
+plot(k1_boundary, k2_values, type = 'l', xlab = 'k1', ylab = 'k2')
+text(3.5, 3, 'stable')
+text(1.5, 6, 'unstable')
+```
+
+R tutorial, part 4: THe basics of plotting in R
+```{r}
+#library(readr)
+frog<- read.csv("~/Desktop/frog_data.csv")
+plot(frog) # R will plot each variable against every other variable
+
+# 1. Scatter plot
+plot(fungus~worms, data = frog)
+# very basic plot format: plot(variable1 ~ variable2, data = dataframe)
+# other style to plots
+  #xlab, ylab
+  #pch: shape of data points 
+  #cex: scale text and symbols relative to default
+  # col = colors
+  #.axis or .lab: control size or col of axis and labels
+  # xlim, ylim
+  # type = 'l' or 'b'
+
+plot(fungus~ worms, data = frog,
+     ylab = 'fungus(zoospores)', xlab = 'worms(number per frog)',
+     cex = 2, cex.axis = 1.5, pch = 21,
+     col = 'black', bg = 'grey',
+     xlim = c(0, 20), ylim = c(0,100))
+
+
+# 2. Histograms
+hist(frog$weight)
+# 'hist()' does not take a data argument, must specify using frog$weight
+# want to adjust breaks, which accepts a vector
+hist(frog$weight, breaks = c(0, 5, 10, 15, 20))
+
+hist(frog$weight, breaks = seq(0,20,1), col = 'blue', 
+     xlab = 'weight (g)', main = '')
+
+# boxplot
+
+boxplot(weight~color, data = frog,
+        xlab = 'frog color', ylab = 'frog weight')
+# R default for boxplot are 25th and 75th precentile (lower and upper limit quartiles), band near middle is alwasy 50th percentile (median)
+# default boxplot{graphics} code
+  # upper whisker = min(max(x), Q_3 + 1.5*IQR)
+  # lower whisker = max(min(x), Q_1 - 1.5*IQR)
+      # IQR = Q3 - Q1 is the box length 
+
+
+# Save/Export Figures
+# 1. open plotting 'device' and specify the file path
+# 2. run the plot function
+# 3. close the device
+
+jpeg('Figure_1.jpg') # add path to this
+plot(fungus~ worms, data = frog,
+     ylab = 'fungus(zoospores)', xlab = 'worms(number per frog)',
+     cex = 2, cex.axis = 1.5, pch = 21,
+     col = 'black', bg = 'grey',
+     xlim = c(0, 20), ylim = c(0,100))
+dev.off()
+
+```
+
+ggplot
+```{r}
+# base plot
+plot(fungus ~ worms, data = frog)
+
+# ggplot
+ggplot(data = frog, aes(x = worms, y = fungus)) + geom_point()
+
+# parts of a ggplot
+# 1. function 'ggplot()'
+# 2. the arguments
+  # data, aes, geom, stats, facets, scales, theme, and others
+
+# data: assign their plot function to a variable
+myplot <- ggplot(data = frog)
+
+# aes: how data are visually represented, once will be independent (x), another will be dependent (y) 
+myplot <- ggplot(data = frog, aes(x = worms, y = fungus))
+
+# geom: how we create the layer we actually see as our figure
+  # geom_point(), geom_line(), geom_boxplot(), geom_text()
+myplot <- ggplot(data = frog, aes(x = worms, y = fungus)) + geom_point()
+myplot
+
+  # add color and change data points
+myplot <- ggplot(data = frog, aes(x = worms, y = fungus, color = sex)) + geom_point(size = 3)
+myplot
+
+
+## 3 geoms for summarization
+
+# 1. Boxplot
+ggplot(data = frog, aes(x = color, y = fungus)) + geom_boxplot()
+
+# 2. Histogram; only need to specify 1 vector to be visualized in aes()
+ggplot(data = frog, aes(x = worms)) + 
+  geom_histogram(binwidth = 2, color = 'black', fill = 'white')
+
+# 3. Facets; panels which plots of mapped variables are arranged according to a cateforical grouping variable
+ggplot(data = frog, aes(x = worms, y = fungus)) + geom_point(size = 3) +
+  facet_grid(.~sex) # sex is grouping variable
+# specifying the group variable on the left 'facet_grid(sex~.)' arranges facets in one column
+# specifying the group variable on the right 'facet_grid(.~sex)' arranges facets in one row
+ggplot(data = frog, aes(x = worms, y = fungus)) + geom_point(size = 3) +
+  facet_grid(sex~.)
+
+# facet 2+ grouping variables
+ggplot(data = frog, aes(x = worms, y = fungus)) + 
+  geom_point(size = 3) +
+  facet_grid(sex~color)
+
+## Stats
+
+# add linear fit line to a scatter plot
+ggplot(data = frog, aes(x = worms, y = fungus)) + 
+  geom_point(size = 3) +
+  geom_smooth(method = lm)
+
+# Theme and controlling figure appearance
+# control the non-data elements (text, axes, legends)
+
+ggplot(data = frog, aes(x = worms, y = fungus, color = virus)) + 
+  geom_point(size = 3) +
+  theme(legend.key = element_rect(fill = NA),
+        legend.position = 'bottom', 
+        axis.title = element_text(angle = 0, size = 18, face = 'bold'),
+        legend.text = element_text(angle = 0, size = 12, face = 'bold'),
+        panel.background = element_rect(fill = NA))
+
+# save ggplot figure
+ggsave('myplot.jpg', width = 8, height = 8, unit = 'cm', dpi = 300)
+```
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

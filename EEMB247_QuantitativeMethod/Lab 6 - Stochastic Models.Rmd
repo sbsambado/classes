@@ -1,0 +1,336 @@
+---
+title: "Lab 6 - Stochastic Models"
+author: "sbsambado"
+date: "3/24/2020"
+output: html_document
+---
+
+Part 1: Brief tutorial on probability distributions in R
+
+Distribution (R name)
+
+Discrete distribution
+  binomial (binom)
+  poisson (pois)
+  negative binomial (nbinom)
+  geometric (geom)
+  beta binomial (bbinom)
+  
+Continuous distribution
+  uniform (unif)
+  normal (norm)
+  gamma (gamma)
+  exponential (exp)
+  beta (beta)
+  lognormal (lnorm)
+  
+Other distributions for statistical tests
+  student t (t)
+  F (f)
+  chisquare (chisq)
+  tukey (tukey)
+  wilcoxon (wilcox)
+  logistic (logis)
+  
+For any of these distributions, there are 4 functions where name is the R name of the distributions from above
+  dname()   density or probability function
+  pname()   cumulative density
+  qname()   quantile function
+  rname()   random deviates
+  
+Discrete distribution can be described by its distribution function, which is a formula for the probability that the outcome of an experiment or observation (called random variable) X is = to a particular value x 
+    f(x) = Prob(X = x)
+    
+Continuous distribution, such as normal distribution, x can take on an infinite number of values, so the probability of any specific value is vanishingly small. Continuous probability distributions, are expressed as probabilities denstieis rather than porbabilities, that is, the probability that random variable X is between x and x + deltax, divided by deltax. Dividing by deltax allows the observed probability density to have a well-defined limit as deltax shrinks to 0
+
+```{r}
+# density function for a normal distribution with mean = 0, sd = 1
+# dnorm density function : dnorm(x, mean = 0, sd = 1, log = FALSE)
+x <- seq(-5, 5, 0.01)
+f <- dnorm(x)
+plot(x, f, type = 'l', main = 'probability density for N(0,1)')
+
+# cumulative density function, pname()
+# probability that the random variable X is less than or equal to a particular value of x. F(x) = Prob(X <= x)
+# cumulative density function for normal distribution is: pnorm(x, mean = 0, sd = 1, lower.tail = TRUE, log.p = FALSE)
+  # lower.tail(): if TRUE probabilities are P[X <= x], otherwise P[X > x]
+x <- seq(-5, 5, 0.01)
+F <- pnorm(x)
+plot(x, F, type = 'l', main = 'cumulative density for N(0,1)')
+
+# calculate probability of x <- -2
+pnorm(-2)
+# caluclate probability of x between -1 and 1
+pnorm(1) - pnorm(-1)
+# calculate probability of x > 1
+1 - pnorm(1)
+
+```
+Quantile Function, qname()
+Quantile function is inverse of the cumulative distribution function. It will tell you the value of x at which a given quantile of the distribution occurs.
+R command for the quantile function for the normal distribution is: qnorm(p, mean = 0, sd = 1, lower.tail = TRUE, log.p = FALSE)
+```{r}
+p <- seq(0.05, 0.95, by = 0.05)
+x <- qnorm(p)
+x
+
+# plot of the probabilities density function
+x <- seq(-5, 5, 0.01)
+f <- dnorm(x)
+plot(x, f, type = 'l', main = 'divide N(0,1) into equal probability slices')
+
+p <- seq(0.05, 0.95, by = 0.05)
+xquants <- qnorm(p)
+abline(v = xquants, col = 'red')
+
+
+# cumulative density function
+x <- seq(-5, 5, 0.01)
+F <- pnorm(x)
+plot(x, F, type = 'l', main = 'Cumulative density for N(0,1')
+
+x <- seq(0.05, 0.95, by = 0.05)
+xquants <- qnorm(p)
+abline(v = xquants, col = 'red')
+abline(h = p, col = 'grey')
+```
+
+Random deviates, rname()
+Random deviates are random draws from a particular probability distribution.This is helpful for stochastic modeling.
+
+R command for quantile function for the normal distribution: rnorm(n, mean = 0, sd = 1)
+```{r}
+# take 5 random draws from a normal distribution with mean = 10, sd = 2
+rnorm(5, mean = 10, sd = 2)
+
+# take a sample of 100 random draws from a normal distribution with mean = 10, and sd = 2
+mysample <- rnorm(1000, mean = 10, sd = 2)
+
+# histogram
+hist(mysample, col = 'blue', breaks = seq(0.5, 20, .5), freq = FALSE)
+
+x <- seq(0,20, 0.1)
+y <- dnorm(x, mean = 10, sd = 2)
+lines(x, y, col = 'red', lwd = 2)
+
+
+```
+
+Flipping a coin in R:
+In R, to run a uniform distribution between 0 and 1 from a single draw is: 'runif(1)'
+
+If you flip an unbiased coin, probability of heads is p = 0.5 so u = runir(1) and if u < 0.5, then the outcome is heads and if u >= 0.5, then it's tails
+
+If you flip a biased coin, probability of heads i p = 0.55, then the criteria for a heads is u < 0.55, and the criteria for tails is u >= 0.55
+```{r}
+# flip biased coin with probability of heads is p = 0.55 and want to set x = 1 if the outcome is heads, and x = 2 if the outcome is tails
+
+p = 0.55
+u = runif(1)
+if (u < p) {
+  x <- 1
+} else {
+  x <- 2
+}
+x
+
+# OR, use 'ifelse'
+
+x <- ifelse(runif(1) < 0.55, 1, 2)
+x
+
+
+```
+Rolling the dice in R
+```{r}
+# 3 sided die, draw uniformly distributed random number between 0 and 1 ('u = runif(1))
+p1 = 0.2
+p2 = 0.3
+p3 = 1 - p1 -p2
+u = runif(1)
+if (u < p1) {
+  x <- 1
+} else if (u < (p1 + p2)) {
+  x <- 2
+} else {
+  x <-3
+}
+x
+```
+Stochastic simulation
+
+Method 1: Approximate stochastic realization by dividing the system into discrete time steps
+
+Steps to generate a single stochastic realization
+  1. Assign values to your parameters, k1, k3, and D (D = 1), and set your time increment, delta*t [Note: k1Ddeltat - k3ideltat has to be <= 1 so if k1 or k3 is larger, you'll have to use a small time step deltat]
+  2. Initialize M to some starting value (save values of M at each step, set up structure to hold results i.e. a vector or Mvalues <- numeric(0))
+  3. Loop thorugh time from a start time to a stop time in increments of deltat. Each iteration of the loop do:
+      a. calculate probability of M increasing by 1 (doesn't change through time)
+      b. calculate probability of M decreasing by 1 (current value of M)
+      c. calculate probability of M staying the same
+      d. roll 3-sides die and depending on the outcome either incerase M, decrease M, or have M remain unchanged
+  4. Plot results through time
+```{r}
+# Generate single stochastic realization using Method 1, plot realization of ht eproduction and decay of mRNA model through time
+D = 1
+k1 <- 0.1 
+k3 <- 0.001
+dt <- 0.1
+Tend <- 10000
+time <- seq(0, Tend, dt)
+Msave = numeric(length(time))
+M = 20
+
+for (i in 1:length(time)) {
+  Msave[i] <- M
+  p1 <- k1*D*dt
+  p2 <- k3*M*dt
+  u = runif(1)
+  if (u < p1) {
+    M <- M + 1
+  } else if (u < (p1 + p2)) {
+    M <- M - 1
+  } else {
+    M <- M
+  }
+}
+
+plot(time, Msave, type = 'l')
+
+# set for loop to run large number of stochastic realizations of this model, only saving final state of system for each run (value of M at t = 10000)
+
+Nruns = 100
+D = 1
+k1 <- 0.1 
+k3 <- 0.001
+dt <- 0.1
+Tend <- 1000
+Mstate = numeric(Nruns)
+
+for (run in 1:Nruns) {
+  M = 20
+  t = 0
+  while (t <Tend) {
+    p1 <- k1*D*dt
+    p2 <- k3*M*dt
+    u = runif(1)
+    if (u < p1) M <- M + 1
+    else if (u < (p1 + p2)) M <- M - 1
+    t <- t + dt
+  }
+  Mstate[run] <- M
+}
+
+hist(Mstate)
+
+hist(Mstate, freq = FALSE, col = 'grey')
+xfit <- seq(min(Mstate), max(Mstate))
+yfit <- dpois(xfit, (k1/k3))
+lines(xfit, yfit, col = 'blue', lwd =2)
+
+```
+
+Method 2: Exact stochastic realization using Gillespie's algorithm
+
+First method is just an approximiation and assumes that deltat is small enough that the prbability that two events (births and deaths) occur within deltat is neglible.
+
+Gillespie algorithm is an exact alternative that instead treats time as conitnuous and uses two random numbers to determine (i) time to next event and (ii) which event occurs
+
+Consider a spatially homogeneous reacting system with a fixed volume and at a constant temperature
+
+The system involves N species {S1,...SN}, represented by dynamical state vector X(t) = (X1(t),..XN(t)), where Xi(t) is the population size of species Si in the system at time t
+  In the system, there are K reactions {R1,..,RK}. Each reaction Rj is characterized by 
+    1. propensity function (aj), where aj(x)dt is the probability, given the state of they system at time t, that one Rj will occur infinitesimal time interval (t, t + dt), and
+    2. state change vector (vj = {V1j, ..., vNj}), in which vij is the change in number of species Si due to one Rj reaction
+    
+Steps to generate a single stochastic realization using Method 2
+  1. assing values to parameters, k1, k3, and D (D = 1)
+  2. Initialize the state of the system to some starting value. For a single state variable X(t) = M(t). To save M values at each step, create a holidng vector (Mvalues<- numeric()0)
+  3. Initialize time to t = 0 (want to plot through time? save vale of time at each step i.e. tvalues <-numeric(0))
+  4. Loop through time, maybe using a 'while' loop
+      a. calculate propensity functions on current state of system
+        ie. a1 = k1D ; a2 = k3M, with atot = a1 + a2
+      b. Generate two random draws, u1 + u2, from a uniform distribution on the interval [0,1]
+      c. Determine time to next event
+      d. determine which reactions occurs
+          if u2 < a1/atot then reaction 1 occurs
+          if u2 >= (a1/atot) then reaction 2 occurs
+      e. update time: t = t + tau
+      f. update the state of the system, depending on which reaction occurs
+          if reaction 1 occurs, M <- M + 1
+          if reaction 2 occurs, M <- M - 1
+  5. Plot results through time
+```{r}
+# generate a single stochastic realization using the Gillespie algorithm
+D = 1
+k1 <- 0.1
+k3 <- 0.001
+dt <- 0.1
+Tend <- 10000
+Msave = numeric(0)
+Tsave = numeric(0)
+
+  M = 20
+  t = 0
+  i = 0
+
+while(t < Tend) {
+  i = i + 1
+  a1 <- k1*D
+  a2 <- k3*M
+  atot <- a1 + a2
+  u1 = runif(1)
+  u2 = runif(1)
+  tau <- log(1/u1)/atot
+  if (u2 < (a1/atot)) M <- M + 1
+  else M <- M - 1
+Msave[i] <- M
+Tsave[i] <- t
+t <- t + tau
+}
+  Msave
+
+plot(Tsave, Msave, type = 'l')
+lines(Tsave, Msave, type = 'l', col = 'red')
+
+# generate large number of stochastic realization and save the final stae of the system for each run
+Nruns = 10000
+D = 1
+k1 <- 0.1
+k3 <- 0.01
+dt <- 0.1
+Tend <- 10000
+Mtate = numeric(Nruns)
+
+for (run in 1:Nruns) {
+  M = 20
+  t = 0
+  i = 0
+
+while(t < Tend) {
+  i = i + 1
+  a1 <- k1*D
+  a2 <- k3*M
+  atot <- a1 + a2
+  u1 = runif(1)
+  u2 = runif(1)
+  tau <- log(1/u1)/atot
+  
+  if (u2 < (a1/atot)) M <- M + 1
+  else M <- M - 1
+t <- t + tau
+}
+  Mstate[run] <- M
+}
+xfit<- seq(min(Mstate), max(Mstate))
+hist(Mstate, freq = FALSE, col = 'grey')
+yfit <- dpois(xfit, (k1/k3))
+lines(xfit, yfit, col = 'blue', lwd = 2)
+
+plot(Tsave, Msave, type = 'l')
+
+lines(Tsave,Msave, type = 'l', col = 'red')
+
+```
+
+

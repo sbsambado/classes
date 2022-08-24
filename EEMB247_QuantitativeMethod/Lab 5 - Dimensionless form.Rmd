@@ -1,0 +1,253 @@
+---
+title: "Lab 5 - Dimensionless form"
+author: "sbsambado"
+date: "3/24/2020"
+output: html_document
+---
+
+EEMB247: Computer lab 5: Dimensionless form and types of cycles
+
+Most variables and parameters in models have units. However, the behavior of a natural system cannot be affected by the units in which we chose to measure the quantities we use to describe it.
+
+This implies that it should be possible to write down the defining equations of a model in a form independent of the units we use, aka dimensionless form
+
+The key to converting set of equations to a dimensionless form lies in identifying a natrual scale or base unit for each quantity in the equations and then using the ratio of each variable to its natural scale in our dynamic description. Such ratios are pure numbers, dimensionless.
+
+The process of non-dimensionalization or dimensional analysis can serve two purposes:
+1. gives us a way of checking if our model is internally consistent
+2. allows us to potentiall reduce the number of parameters that are controlling the dynamical system
+```{r}
+#library(deSolve)
+#library(ggplot2)
+```
+
+
+##1. The Brusselator in One Dimension
+Some partial differential equations can produce spatial patterns from an arbitrary
+initial state. These so-called Turing patterns occur under certain conditions in
+coupled models of reacting and diffusing chemicals:
+
+$$
+\begin{align}
+&\frac{\partial U}{\partial t} = D_U \frac{\partial^2U}{\partial x^2} + f(U,V) \\
+&\frac{\partial V}{\partial t} = D_V\frac{\partial^2V}{\partial x^2} + g(U,V)
+\end{align}
+$$
+
+
+For example, the Brusselator was proposed aas a model for an auto-catalytic chemical reaction,
+between two products, A and B, and producing also C and D in a number ofintermediary steps. The chemical reactions are given by:
+
+
+$$
+\begin{align}
+ A\hspace{3mm}  &  \xrightarrow{\hspace{3mm} k_1 \hspace{3mm}}& X_1\\
+\\
+   B+X_1\hspace{3mm} &  \xrightarrow{\hspace{3mm} k_2 \hspace{3mm}}& X_2 + C\\
+\\
+   2X_1 + X_2\hspace{3mm}& \xrightarrow{\hspace{3mm}  k_3 \hspace{3mm} } & 3X_1\\
+\\
+   X_1\hspace{3mm} & \xrightarrow{\hspace{3mm}  k_4 \hspace{3mm} } & D
+\end{align}
+$$
+
+where the $k_i$ are the reaction rate constants. Assuming that the concentrations of $A$
+and $B$ are kept constant, at values $a$ and $b$ respectively, the equations governing the
+dynamics of $X_1$ and $X_2$ are:
+
+$$
+\begin{align}
+&\frac{dX_1}{dt} = k_1a−k_2bX_1+k_3X_1^2X_2−k_4X_1\\
+&\frac{dX_2}{dt} = k_2bX_1−k_3X_1^2X_2
+\end{align}
+$$
+
+
+Setting $k_1$, $k_2$, $k_3$, and $a$ all equal to 1, $k_4 = 4$ and $b$ = 3 and adding diffusion we obtain:
+
+
+$$
+\frac{\partial X_1}{\partial t} = D_{X_1} \frac{\partial^2X_1}{\partial x^2} + 1 + X_1^2X_2 - 4X_1\\
+\frac{\partial X_2}{\partial t} = D_{X_2}\frac{\partial^2X_2}{\partial x^2} + 3X_1 - X_1^2X_2
+$$
+
+
+
+It is instructive to implement the Brusselator first in one spatial dimension, and on a
+numerical grid composed of 50 boxes (N). We take for the boundary concentrations a value of 1 and 3 for $X_1$ and $X_2$ respectively. The diffusion coefficients, $D_{X_1}$ and $D_{X_2}$, are taken to be 0.02.
+
+```{r}
+library(ReacTran)
+N <-50
+Grid <- setup.grid.1D(x.up = 0, x.down = 1, N = N)
+```
+
+
+We choose interesting initial conditions:
+
+```{r}
+x1ini <- 1 + sin(2 * pi * Grid$x.mid)
+x2ini <- rep(x = 3, times = N)
+yini <- c(x1ini, x2ini)
+```
+
+
+The derivative function is:
+
+```{r}
+brusselator1D <- function(t, y, parms) {
+  X1 <- y[1:N]
+  X2 <- y[(N+1):(2*N)]
+
+  dX1 <- 1 + X1^2*X2 - 4*X1 + 
+      tran.1D (C = X1, C.up = 1, C.down = 1,
+              D = 0.02, dx = Grid)$dC
+  dX2 <- 3*X1 - X1^2*X2 +
+      tran.1D (C = X2, C.up = 3, C.down = 3,
+              D = 0.02, dx = Grid)$dC
+  list(c(dX1, dX2))
+}
+
+```
+
+The equations are solved using function ode.1D, and output generated for
+t = 0,0.1,0.2, . . . , 10. The time it takes to solve the model is printed. Note that we
+specify the number of boxes (dimens), as well as the number of chemical species
+(nspec). We also pass the names of the chemical species, which will facilitate
+plotting the output.
+
+```{r}
+times <- seq(from = 0, to = 10, by = 0.1)
+print(system.time(
+out <- ode.1D(y = yini, func = brusselator1D,
+              times = times, parms = NULL, nspec = 2,
+              names = c("X1", "X2"), dimens = N)
+))
+```
+
+We take the opportunity to show the various ways in which deSolve’s plotting
+method image can be used to display the output. We start by specifying
+the number of figures in a row (mfrow = c(2,2)); the subsequent calls to
+image then pass mfrow = NULL to avoid the function overruling this property.
+The first variable (which = "X1") is then plotted, first as a simple contour
+plot, then as a filled.contour (the default), and then twice as a persp plot;
+the first time without colour added (col = NA), the second time using the default
+colour scheme (which need not be specified), and adding a certain shade. We also pass the positions in the middle of each grid cell (Grid$x.mid). Before making
+the persp plots, the margin size is reduced (mar).
+
+(don't worry about the error messages about 'x' is NULL so the result will be NULL.)
+
+```{r}
+par(mfrow = c(2, 2))
+image(out, mfrow = NULL, grid = Grid$x.mid,
+      which = "X1", method = "contour")
+image(out, mfrow = NULL, grid = Grid$x.mid,
+      which = "X1")
+      par(mar = c(1, 1, 1, 1))
+image(out, mfrow = NULL, grid = Grid$x.mid,
+      which = "X1", method = "persp", col = NA)
+      image(out, mfrow = NULL, grid = Grid$x.mid,
+      which = "X1", method = "persp", border = NA,
+      shade = 0.3 )
+
+```
+
+
+##2. The Brusselator in Two Dimensions
+
+In the presence of diffusion and when implemented in 2-D, this simple chemical
+model can exhibit pattern-forming (so-called Turing) instabilities. Thus, the
+system, when initiated from a random distribution quickly generates spectacular
+oscillations or chaotic spatial concentration patterns.
+The model in 2-D, implemented in R is very similar to the 1-D implementation:
+
+```{r}
+brusselator2D <- function(t, y, parms) {
+  X1 <- matrix(nrow = Nx, ncol = Ny, 
+               data = y[1:(Nx*Ny)])
+  X2 <- matrix(nrow = Nx, ncol = Ny, 
+               data = y[(Nx*Ny+1):(2*Nx*Ny)])
+
+  dX1 <- 1 + X1^2*X2 - 4*X1 + 
+        tran.2D (C = X1, D.x = D_X1, D.y = D_X1,
+        dx = Gridx, dy = Gridy)$dC
+  dX2 <- 3*X1 - X1^2*X2 +
+        tran.2D (C = X2, D.x = D_X2, D.y = D_X2,
+        dx = Gridx, dy = Gridy)$dC
+  list(c(dX1, dX2))
+}
+```
+
+Note that we have imposed zero-gradient boundaries in the x− and y− direction. As
+this is the default, the boundary conditions need not be explicitly specified.
+The numerical grid is composed of 50 boxes in the x− and y− directions,
+extending from 0 to 1.
+
+```{r}
+library(ReacTran)
+Nx <- 50
+Ny <- 50
+Gridx <- setup.grid.1D(x.up = 0, x.down = 1, N = Nx)
+Gridy <- setup.grid.1D(x.up = 0, x.down = 1, N = Ny)
+```
+
+We choose parameter values that give interesting patterns (these require at least the
+two diffusion coefficients to be different):
+
+```{r}
+D_X1 <- 2
+D_X2 <- 8*D_X1
+```
+
+As initial condition for the two chemical substances, simple random numbers in
+between 0 and 1 are used:
+
+```{r}
+X1ini <- matrix(nrow = Nx, ncol = Ny, data = runif(Nx*Ny))
+X2ini <- matrix(nrow = Nx, ncol = Ny, data = runif(Nx*Ny))
+yini <- c(X1ini, X2ini)
+```
+
+
+The model is solved using deSolve function ode.2D and output generated for t =
+0, 1, . . . 8. The size of the work space (lrw), the number of modeled components
+(nspec) and their names, and the dimensions of the domain (dimens) is given.
+
+
+```{r}
+times <- 0:8
+out <- ode.2D(y = yini, parms = NULL, func = brusselator2D,
+                nspec = 2, dimens = c(Nx, Ny), times = times,
+                lrw = 2000000, names=c("X1", "X2"))
+```
+
+Finally the output is plotted using deSolve’s function image. For the
+main title above each figure (main) we write the time; a global title is written with
+mtext; we first increase the size of the outer margin (oma).
+
+```{r}
+par(oma = c(0,0,1,0))
+image(out, which = "X1", xlab = "x", ylab = "y",
+        mfrow = c(3, 3), ask = FALSE,
+        main = paste("t = ", times),
+        grid = list(x = Gridx$x.mid, y = Gridy$x.mid))
+mtext(side = 3, outer = TRUE, cex = 1.25, line = -1,
+        "2-D Brusselator, species X1")
+
+```
+
+
+
+
+Already at t = 1, the initial random pattern has given way to a quite structured
+spatial pattern. With these parameter values, usually a random pattern returns at
+around t = 8 (but every run is different).
+
+
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
