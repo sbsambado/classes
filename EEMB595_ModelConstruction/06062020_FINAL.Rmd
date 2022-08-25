@@ -1,0 +1,4942 @@
+---
+title: "595CA Final Final"
+author: "sbsambado"
+date: "6/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+
+
+```{r DONT USEdensity dependent host tick metapopulation}
+library(deSolve)
+
+host.tick <- function(t, x, params) {
+  S = x[1]
+  X = x[2]
+  
+  T = x[3]
+  Y = x[4]
+  
+  V = x[5] # total tick pop
+  N = x[6] # total host pop
+  
+  beta = params[1]
+  b = params[2]
+  K = params[3]
+  M = params[4]
+  b = params[5]
+  d = params[6]
+  A_hat = params[7]
+  A = params[8]
+  v = params[9]
+  
+  dSdt = (b*V) - (b*((S*V)/(M*N))) - (A*((S*Y)/N)) - (d*S)
+  dXdt = (A*((S*Y)/N)) - (b*((X*V)/M*N)) - (d*X)
+  
+  dTdt = (beta*N) - (beta*((T*N)/K)) - (A_hat*((T*X)/N)) - (b*T) + (v*Y)
+  dYdt = (A_hat*((T*X)/N)) - (beta*((Y*N)/K)) - ((b + v)*Y)
+  
+  dVdt = (dSdt + dXdt)
+  dNdt = (dTdt + dYdt)
+  
+  return(list(c(dSdt, dXdt, dTdt, dYdt, dVdt, dNdt)))
+}
+# tick
+#V = S + X
+S0 = 100 # susceptible tick
+X0 = 1 # infected tick
+V = 101 # tick pop v = s + x
+
+
+# host
+T0 = 20 # susceptible host
+Y0 = 0 # infected host
+N = 20 # host pop n = t + y
+
+initial_values = c(S = S0, X = X0, V = V,
+                   T = T0, Y = Y0, N = N)
+
+
+# decent params, .2, .9, 300, 3000, .01, .01, .2, .7, .9
+# .2, .75, 1200, 100, .01, .001, .005, .05, .51 for 1000, 125 and 1000 114
+  beta = .02 # growth rate host
+  b = 1 # growth rate ticks
+  K = 25 # carrying capacity for hosts per m^2
+  M = 100 # max number of ticks per host # OG 200
+  b = 0.2 # natural mortality host
+  d = 0.2 # natural mortality ticks # OG .01 
+  A_hat = 0.08 # transmission rate from ticks to hosts #OG .02
+  A = 0.05 # transmission rate from host to ticks # OG .07
+  v = .6 # host recovery rate
+  
+parameters = c(beta, b, K, M, b, d, A_hat, A, v)
+
+times = seq(0, 60, length.out = 10000)
+
+results = lsoda(initial_values, times, host.tick, parameters)
+head(results)
+
+Scol = 'green'
+Xcol = 'red'
+Tcol = 'blue'
+Ycol = 'orange'
+
+plot(x = results[, "time"], y = results[, "S"], type = 'l', col=Scol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,200),
+     xlim = c(0,60),main = "Host - Tick Metapopulation Model")
+lines(x = results[, "time"], y = results[, "X"], col = Xcol, lwd = 2)
+lines(x = results[, "time"], y = results[, "T"], col = Tcol, lwd = 2)
+lines(x = results[, "time"], y = results[, "Y"], col = Ycol, lwd = 2)
+#lines(x = results[, "time"], y = results[, "V"], col = 'black', lwd = 2)
+#lines(x = results[, "time"], y = results[, "N"], col = 'grey', lwd = 2)
+legend('topright', legend = c('Tick, Uninfected (S)', 'Tick, Infected (X)', 'Host Uninfected (T)', 'Host Infected (Y)','Tick pop', 'Host pop'), col = c(Scol, Xcol, Tcol, Ycol, 'black', 'grey'),
+       lwd = 2,cex = 0.9)
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r DONT USE not density dependent}
+library(deSolve)
+
+host.tick <- function(t, x, params) {
+  S = x[1]
+  X = x[2]
+  
+  T = x[3]
+  Y = x[4]
+  
+  V = x[5] # total tick pop
+  N = x[6] # total host pop
+  
+  beta = params[1]
+  b = params[2]
+  K = params[3]
+  M = params[4]
+  b = params[5]
+  d = params[6]
+  A_hat = params[7]
+  A = params[8]
+  v = params[9]
+  
+  dSdt = (b*V) - ((b*S*V)/(M*N)) - ((A*S*Y)/N) - (d*S)
+  dXdt = (A*((S*Y)/N)) - ((b*X*V)/M*N) - (d*X)
+  
+  dTdt = (beta*N) - ((beta*T*N)/K) - ((A_hat*T*X)/N) - (b*T) + (v*Y)
+  dYdt = ((A_hat*T*X)/N) - ((beta*Y*N)/K) - ((b + v)*Y)
+  
+  dVdt = (dSdt + dXdt)
+  dNdt = (dTdt + dYdt)
+  
+  return(list(c(dSdt, dXdt, dTdt, dYdt, dVdt, dNdt)))
+}
+# tick
+#V = S + X
+S0 = 1000 # susceptible tick
+X0 = 225 # infected tick
+V = 1225 # tick pop v = s + x
+
+
+# host
+T0 = 1000 # susceptible host
+Y0 = 200 # infected host
+N = 1200 # host pop n = t + y
+
+initial_values = c(S = S0, X = X0, V = V,
+                   T = T0, Y = Y0, N = N)
+
+
+# decent params, .2, .9, 300, 3000, .01, .01, .2, .7, .9
+# .2, .75, 1200, 100, .01, .001, .005, .05, .51 for 1000, 125 and 1000 114
+  beta = .42 # growth rate host
+  b = .95 # growth rate ticks
+  K = 1200 # carrying capacity for hosts per m^2
+  M = 100 # max number of ticks per host # OG 200
+  b = 0.01 # natural mortality host
+  d = 0.001 # natural mortality ticks # OG .01 
+  A_hat = 0.002 # transmission rate from ticks to hosts #OG .02
+  A = 0.002 # transmission rate from host to ticks # OG .07
+  v = .91 # host recovery rate
+  
+parameters = c(beta, b, K, M, b, d, A_hat, A, v)
+
+times = seq(0, 60, length.out = 10000)
+
+results = lsoda(initial_values, times, host.tick, parameters)
+head(results)
+
+Scol = 'green'
+Xcol = 'red'
+Tcol = 'blue'
+Ycol = 'orange'
+
+plot(x = results[, "time"], y = results[, "S"], type = 'l', col=Scol, las = 1, lwd=2, xlab = 'Time', ylab = 'Number of Individuals', ylim = c(0,2500),
+     xlim = c(0,60),main = "Host - Tick Metapopulation Model")
+lines(x = results[, "time"], y = results[, "X"], col = Xcol, lwd = 2)
+lines(x = results[, "time"], y = results[, "T"], col = Tcol, lwd = 2)
+lines(x = results[, "time"], y = results[, "Y"], col = Ycol, lwd = 2)
+#lines(x = results[, "time"], y = results[, "V"], col = 'black', lwd = 2)
+#lines(x = results[, "time"], y = results[, "N"], col = 'grey', lwd = 2)
+legend('topright', legend = c('Tick, Uninfected (S)', 'Tick, Infected (X)', 'Host Uninfected (T)', 'Host Infected (Y)','Tick pop', 'Host pop'), col = c(Scol, Xcol, Tcol, Ycol, 'black', 'grey'),
+       lwd = 2,cex = 0.9)
+
+```
+
+
+
+
+
+
+
+```{r DONT USEno host mortality, changed T to H for susceptible host}
+host.tick <- function(t, x, params) {
+  T = x[1]
+  X = x[2]
+  
+  H = x[3]
+  Y = x[4]
+  
+  V = x[5] # total tick pop
+  N = x[6] # total host pop
+  
+  beta = params[1]
+  b = params[2]
+  K = params[3]
+  M = params[4]
+  b = params[5]
+  d = params[6]
+  A_hat = params[7]
+  A = params[8]
+  v = params[9]
+  
+  # tick equations
+  dTdt = (b*V) - (b*((T*V)/(M*N))) - (A*((T*Y)/N)) - (d*T) # susceptible
+  dXdt = (A*((T*Y)/N)) - (b*((X*V)/M*N)) - (d*X) # infected
+  
+  # host equations
+  dHdt = (beta*N) - (beta*((H*N)/K)) - (A_hat*((H*X)/N)) + (v*Y) # susceptible
+  dYdt = (A_hat*((H*X)/N)) - (beta*((Y*N)/K)) - (v*Y) # infected
+  
+  # population equations
+  dVdt = (dTdt + dXdt) # tick pop
+  dNdt = (dHdt + dYdt) # host pop
+  
+  return(list(c(dTdt, dXdt, dHdt, dYdt, dVdt, dNdt)))
+}
+# tick
+#V = S + X
+T0 = 175 # susceptible tick
+X0 = 25 # infected tick
+V = T0 + X0 # tick pop v = s + x
+
+
+# host
+H0 = 99 # susceptible host
+Y0 = 1 # infected host
+N = H0 + Y0 # host pop n = t + y
+
+initial_values = c(T = T0, X = X0, V = V,
+                   H = H0, Y = Y0, N = N)
+
+
+# decent params, .2, .9, 300, 3000, .01, .01, .2, .7, .9
+# .2, .75, 1200, 100, .01, .001, .005, .05, .51 for 1000, 125 and 1000 114
+  beta = 0 # growth rate host
+  b = .02 # growth rate ticks
+  
+  K = 12 # carrying capacity for hosts per m^2
+  M = 15 # max number of ticks per host # OG 200
+  
+  b = 0 # natural mortality host
+  d = 0.1 # natural mortality ticks # OG .01 
+  
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.4 # transmission rate from host to ticks # OG .07
+  v = 0.9 # host recovery rate
+  
+parameters = c(beta, b, K, M, b, d, A_hat, A, v)
+
+times = seq(0, 60, length.out = 10000)
+
+results = lsoda(initial_values, times, host.tick, parameters)
+head(results)
+tail(results)
+# make into data frame to analyze
+model.output <- as.data.frame(ode(y = initial_values, times = times, fun = host.tick, parms = parameters))
+str(model.output)
+
+Tcol = 'red'
+Xcol = 'red'
+Hcol = 'royalblue3'
+Ycol = 'royalblue3'
+
+plot(x = results[, "time"], y = results[, "T"], type = 'l', col=Tcol, las = 1, lwd=2, xlab = 'Time (days)', ylab = 'Number of Individuals', ylim = c(0,200), lty = 3,
+     xlim = c(0,60),main = "Host - Tick Metapopulation Model") # susceptible tick
+lines(x = results[, "time"], y = results[, "X"], col = Xcol, lwd = 2,lty = 1) # infected tick
+lines(x = results[, "time"], y = results[, "H"], col = Hcol, lwd = 2,lty = 3) # susceptible host
+lines(x = results[, "time"], y = results[, "Y"], col = Ycol, lwd = 2,lty = 1) # infected 
+#lines(x = results[, "time"], y = results[, "V"], col = 'black', lwd = 2) # tick
+#lines(x = results[, "time"], y = results[, "N"], col = 'grey', lwd = 2) # host
+legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host Uninfected (H)', 'Host Infected (Y)','Tick pop (V)', 'Host pop (N)'), col = c(Tcol, Xcol, Hcol, Ycol, 'black', 'grey'),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+
+min(results[,])
+```
+
+
+
+
+
+
+
+```{r DONT USEanalyzing model output with no host growth rates}
+
+##### Max number of ticks infected at one time? ####
+## 198.9268
+max(model.output$X)
+
+#### What proportion of the population of ticks been infected over time? ####
+
+# V = T + X
+# V - T = X
+  # proportion of ticks infected (X/V) 
+    ## .125 or 12.5%
+      model.output$X[length(time)]/ V
+
+# N = H + Y
+# N - H = Y
+  # proportion of hosts infected (Y/N) 
+    ## 0.01 or 1%
+      model.output$Y[length(time)]/ N 
+
+### Plot number of infected
+  par(mfrow = c(2,1), mar = c(4,5,2,2))
+  ## Ticks
+    plot(x = model.output$time, y = (model.output$X/model.output$V ), type = 'l', las = 1, col = 'red', 
+         ylab = 'Number of Infected',
+         xlab = 'Time (days)',
+         lwd = 2,
+         cex.axis = .7, cex.lab = .8,
+         main = 'Ticks',
+         font.main = 2)
+   ## Hosts
+    plot(x = model.output$time, y = (model.output$Y/model.output$N ), type = 'l', las = 1, 
+         ylab = 'Number of Infected',
+         xlab = 'Time (days)',
+         col = 'red',
+         lwd = 2,
+         cex.axis= .7, cex.lab = .8,
+         main = 'Hosts', font.main = 2)
+par(mfrow = c(1,1))    
+#### When was the rate of transmission highest? ####
+
+# rate of transmission = dY/dt
+# dY/dt = A*(T*Y/N) - d*T
+
+NewInfec <- A*((model.output$H)*(model.output$X)) # need to double check this
+plot(x = model.output$time, y = NewInfec, lwd = 1, type = 'l',
+     las = 1, 
+     ylab = 'New Infections',
+     xlab = 'Time (days)',
+     main = 'Max New Host Infections',
+     col = 'red')
+max.NewInfec <- max(NewInfec)
+
+for(i in 1:length(time)) {
+  if(NewInfec[i] == max.NewInfec){
+    T.maxnewinf <- tset[i]
+  }
+}
+T.maxnewinf
+abline(v = T.maxnewinf, lty = 2)
+
+#### What happens to R0 as Infectiousness (beta) increases? ####
+A_set <- seq(.1, .9, length.out = 1000)
+
+R0_set <- A_set*N/v
+
+plot(x = A_set, y = R0_set, type = 'l',
+     xlab = 'Host Population Size (N)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Infectiousness (A)')
+
+#### What happens to R0 as N (host population) increases? ####
+N_set <- seq(1, 100, length.out = 1000)
+
+R0_set <- A*N_set/v
+
+plot(x = N_set, y = R0_set, type = 'l',
+     xlab = 'Host Population Size (N)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Host Population Size (N)')
+
+
+### What happens to R0 as host recovery rate increases? ###
+v_set <- seq(.001, .1, length.out = 1000)
+
+R0_set <- A*N/v_set
+
+plot(x = v_set, y = R0_set, type = 'l',
+     xlab = 'Host Recovery Rate (gamma)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Recovery rate (v)')
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+final.model <- function(t, x, params) {
+  T = x[1]
+  X = x[2]
+  H = x[3]
+  Y = x[4]
+  
+  
+  b = params[1] # birth rate ticks
+  M = params[2] # carrying capacity of ticks per host
+  d = params[3] # death rate of ticks
+  A_hat = params[4] # transmission from tick to host
+  A = params[5] # transmission from host to tick
+  g = params[6] # recovery of host
+  v = params[7] #vertical transmision
+  
+  # tick equations 
+  dTdt = (1-v)*(b*(T+X)) - (b*T)/(M*(H+Y)) - (A*(T*Y)/(H+Y)) - (d*T) # susceptible
+  dXdt = v*b*X + (A*(T*Y)/(H+Y)) - (b*X)/(M*(H+Y)) - (d*X) # infected
+  
+  # host equations
+  dHdt =  - (A_hat*H*X)/(H + Y) + (g*Y) # susceptible
+  dYdt = (A_hat*H*X)/(H + Y) - (g*Y) # infected
+  
+  
+  return(list(c(dTdt, dXdt, dHdt, dYdt)))
+}
+# tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+initial_values = c(T = T0, X = X0, H = H0, Y = Y0)
+
+
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .05 # vertical transmisison
+  
+parameters = c(b, M, d, A_hat, A, g, v)
+
+times = seq(0, 6000, length.out = 10000)
+
+results = lsoda(initial_values, times, final.model, parameters)
+head(results)
+tail(results)
+
+# make into data frame to analyze
+final.model.output <- as.data.frame(ode(y = initial_values, times = times, fun = final.model, parms = parameters))
+str(final.model.output)
+
+Tcol = 'red'
+Xcol = 'red'
+Hcol = 'royalblue3'
+Ycol = 'royalblue3'
+
+plot(x = results[, "time"], y = results[, "T"], type = 'l', col=Tcol, las = 1, lwd=2, xlab = 'Time (days)', ylab = 'Number of Individuals', ylim = c(0,200), lty = 3,
+     xlim = c(0,6000),main = "Host - Tick - Pathogen Population Model") # susceptible tick
+lines(x = results[, "time"], y = results[, "X"], col = Xcol, lwd = 2,lty = 1) # infected tick
+lines(x = results[, "time"], y = results[, "H"], col = Hcol, lwd = 2,lty = 3) # susceptible host
+lines(x = results[, "time"], y = results[, "Y"], col = Ycol, lwd = 2,lty = 1) # infected 
+legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+```
+
+
+
+```{r THIS ONE IS FINAL this is at equilibrium final.model and final.model.output changed equations no:V, N, b, beta, Not density dependent for hosts}
+final.model <- function(t, x, params) {
+  T = x[1]
+  X = x[2]
+  H = x[3]
+  Y = x[4]
+  
+  
+  b = params[1] # birth rate ticks
+  M = params[2] # carrying capacity of ticks per host
+  d = params[3] # death rate of ticks
+  A_hat = params[4] # transmission from tick to host
+  A = params[5] # transmission from host to tick
+  g = params[6] # recovery of host
+  v = params[7] #vertical transmision
+  
+  # tick equations
+  dTdt = (((b*(T+X*(1-v))))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T
+  dXdt = ((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X
+  # host equations
+  dHdt =  - (A_hat*H*X)/(H + Y) + (g*Y) # susceptible
+  dYdt = (A_hat*H*X)/(H + Y) - (g*Y) # infected
+  
+  
+  return(list(c(dTdt, dXdt, dHdt, dYdt)))
+}
+# tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+initial_values = c(T = T0, X = X0, H = H0, Y = Y0)
+
+# equilibrium params .9, 1500, .001, .9, .9, .3, .5
+# all initial values = 1
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+  
+parameters = c(b, M, d, A_hat, A, g, v)
+
+times = seq(0, 500, length.out = 2000)
+
+results = lsoda(initial_values, times, final.model, parameters)
+head(results)
+tail(results)
+
+# make into data frame to analyze
+final.model.output <- as.data.frame(ode(y = initial_values, times = times, fun = final.model, parms = parameters))
+str(final.model.output)
+
+Tcol = 'red'
+Xcol = 'red'
+Hcol = 'royalblue3'
+Ycol = 'royalblue3'
+
+plot(x = results[, "time"], y = results[, "T"], type = 'l', col=Tcol, las = 1, lwd=2, xlab = 'Time (days)', ylab = 'Number of Individuals', ylim = c(0,200), lty = 3,
+     xlim = c(0,500),main = "Host - Tick - Pathogen Population Model") # susceptible tick
+lines(x = results[, "time"], y = results[, "X"], col = Xcol, lwd = 2,lty = 1) # infected tick
+lines(x = results[, "time"], y = results[, "H"], col = Hcol, lwd = 2,lty = 3) # susceptible host
+lines(x = results[, "time"], y = results[, "Y"], col = Ycol, lwd = 2,lty = 1) # infected 
+ legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+final.model.output[length(tset),'T']
+final.model.output[length(tset),'X']
+final.model.output[length(tset),'H']
+final.model.output[length(tset),'Y']
+```
+
+
+
+```{r find equilibrium}
+install.packages('rootSolve')
+library(rootSolve)
+final.model_eqm <- function(x, params) {
+  T = x[1]
+  X = x[2]
+  H = x[3]
+  Y = x[4]
+  
+  
+  b = params[1] # birth rate ticks
+  M = params[2] # carrying capacity of ticks per host
+  d = params[3] # death rate of ticks
+  A_hat = params[4] # transmission from tick to host
+  A = params[5] # transmission from host to tick
+  g = params[6] # recovery of host
+  v = params[7] #vertical transmision
+  
+  
+  c(F1 = (((b*(T+X*(1-v))))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T,
+    F2 = ((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X,
+    F3 = - (A_hat*H*X)/(H + Y) + (g*Y),
+    F4 = (A_hat*H*X)/(H + Y) - (g*Y))
+}
+ 
+# equilibrium params .9, 1500, .001, .9, .9, .3, .5
+# all initial values = 1
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+  
+parameters = c(b, M, d, A_hat, A, g, v)
+
+# I already have my final.model function but if I have issues go back and manually upload it here
+# tick
+#V = T + X
+initT = 199 # susceptible tick
+initX = 1 # infected tick
+
+
+# host
+# N = H + Y
+initH = 49 # susceptible host
+initY = 1 # infected host
+
+x = c(T = 199, X = 1, H = 49, Y = 1)
+
+
+```
+
+
+
+
+```{r !!! FIX R0 nEED TO FIX analyze final.model.output R0, proportion}
+##### Max number of ticks infected at one time? ####
+## 198.9268
+max(final.model.output$X)
+
+#### What proportion of the population of ticks been infected over time? ####
+
+# V = T + X
+# V - T = X
+  # proportion of ticks infected (X/V) 
+    ## .125 or 12.5%
+     final.model.output$X[length(time)]/ (T + X)
+
+# N = H + Y
+# N - H = Y
+  # proportion of hosts infected (Y/N) 
+    ## 0.01 or 1%
+      final.model.output$Y[length(time)]/ (H + Y) 
+### Plot number of infected
+  par(mfrow = c(2,1), mar = c(4,5,2,2))
+  ## Ticks
+    plot(x = final.model$time, y = (final.model$X/(final.model$T +  final.model$X)), type = 'l', las = 1, col = 'red', 
+         ylab = 'Number of Infected',
+         xlab = 'Time (days)',
+         lwd = 2,
+         cex.axis = .7, cex.lab = .8,
+         main = 'Ticks',
+         font.main = 2)
+   ## Hosts
+    plot(x = final.model$time, y = (final.model$Y/(final.model$H + final.model$Y)), type = 'l', las = 1, 
+         ylab = 'Number of Infected',
+         xlab = 'Time (days)',
+         col = 'red',
+         lwd = 2,
+         cex.axis= .7, cex.lab = .8,
+         main = 'Hosts', font.main = 2)
+par(mfrow = c(1,1))    
+#### When was the rate of transmission highest? ####
+
+# rate of transmission = dY/dt
+# dY/dt = A*(T*Y/N) - d*T
+
+NewInfec <- A*((final.model.output$H)*(final.model.output$X)) # need to double check this
+plot(x = final.model.output$time, y = NewInfec, lwd = 1, type = 'l',
+     las = 1, 
+     ylab = 'New Infections',
+     xlab = 'Time (days)',
+     main = 'Max New Host Infections',
+     col = 'red')
+max.NewInfec <- max(NewInfec)
+
+for(i in 1:length(time)) {
+  if(NewInfec[i] == max.NewInfec){
+    T.maxnewinf <- tset[i]
+  }
+}T.maxnewinf
+abline(v = T.maxnewinf, lty = 2)
+
+#### What happens to R0 as Infectiousness (beta) increases? ####
+A_set <- seq(.01, .9, length.out = 1000)
+
+R0_set <- (A_set*199)/(50*g)
+
+plot(x = A_set, y = R0_set, type = 'l',
+     xlab = 'Infectiousness (A_set)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Infectiousness (A_set)')
+
+#### What happens to R0 as N (host population) increases? ####
+N_set <- seq(1, 100, length.out = 1000)
+
+R0_set <- A*N_set/g
+
+plot(x = N_set, y = R0_set, type = 'l',
+     xlab = 'Host Population Size (N)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Host Population Size (N)')
+
+
+### What happens to R0 as host recovery rate increases? ###
+g_set <- seq(.001, .1, length.out = 1000)
+
+R0_set <- A*N/g_set
+
+plot(x = g_set, y = R0_set, type = 'l',
+     xlab = 'Host Recovery Rate (gamma)',
+     ylab = 'Reproductive Number (R0)',
+     main = 'Change in Recovery rate (v)')
+```
+
+
+
+```{r simulations for final.model GENERAL change A}
+##########################
+# A = 0.01, gamma = .1
+#########################
+
+
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.4 # transmission rate from ticks to hosts #OG .02
+  A = 0.01 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu1<- NaN*tset; T.simu1[1] <-T0
+X.simu1<- NaN*tset; X.simu1[1] <-X0
+H.simu1<- NaN*tset; H.simu1[1] <-H0
+Y.simu1<- NaN*tset; Y.simu1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu1[i-1]
+  X <- X.simu1[i-1]
+  H <- H.simu1[i-1]
+  Y <- Y.simu1[i-1]
+  
+   # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu1[i] <- T + dT
+  X.simu1[i] <- X + dX
+  H.simu1[i] <- H + dH
+  Y.simu1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected',
+     main = 'A_hat = 0.01, gamma = 0.1')
+
+
+
+
+
+##########################
+# A = 0.1, gamma = .1
+#########################
+
+
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.4 # transmission rate from ticks to hosts #OG .02
+  A = 0.1 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu2<- NaN*tset; T.simu2[1] <-T0
+X.simu2<- NaN*tset; X.simu2[1] <-X0
+H.simu2<- NaN*tset; H.simu2[1] <-H0
+Y.simu2<- NaN*tset; Y.simu2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu2[i-1]
+  X <- X.simu2[i-1]
+  H <- H.simu2[i-1]
+  Y <- Y.simu2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  
+  T.simu2[i] <- T + dT
+  X.simu2[i] <- X + dX
+  H.simu2[i] <- H + dH
+  Y.simu2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected',
+     main = 'A_hat = 0.2, gamma = 0.1')
+
+
+
+##########################
+# A = 0.9, gamma = .1
+#########################
+
+
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.4 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu3<- NaN*tset; T.simu3[1] <-T0
+X.simu3<- NaN*tset; X.simu3[1] <-X0
+H.simu3<- NaN*tset; H.simu3[1] <-H0
+Y.simu3<- NaN*tset; Y.simu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu3[i-1]
+  X <- X.simu3[i-1]
+  H <- H.simu3[i-1]
+  Y <- Y.simu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  
+  T.simu3[i] <- T + dT
+  X.simu3[i] <- X + dX
+  H.simu3[i] <- H + dH
+  Y.simu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected',
+     main = 'A_hat = 0.9, gamma = 0.1')
+
+
+### Plot all 3
+plot(x = tset, y = X.simu3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'Changing transmission rate from host to tick', col = 'red')
+lines(x = tset, y = X.simu2, col = 'red', lwd = 2)
+lines(x = tset, y = X.simu1, col = 'red', lwd = 1)
+legend(x = 'topright', legend = c('A = 0.01','A = 0.1','A = 0.9'),
+       col = 'red', lwd = c(1,2,3))
+
+```
+
+
+
+```{r testing Aset}
+# Aset = seq(0.01, .9, length.out = length(X.simu3))
+# for(i in 2:length(tset)) {
+#   dt <- tset[i] - tset[i-1]
+#   T <- T.simu3[i-1]
+#   X <- X.simu3[i-1]
+#   H <- H.simu3[i-1]
+#   Y <- Y.simu3[i-1]
+#   
+#   # tick equations
+#   dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (Aset*T*Y)/(H+Y) - d*T)*dt
+#   dX = (((b*v*X)/(M*(H+Y))) + (Aset*T*Y)/(H+Y) - d*X)*dt
+#   # host equations
+#   dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+#   dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+#   
+#   
+#   
+#   T.simu3[i] <- T + dT
+#   X.simu3[i] <- X + dX
+#   H.simu3[i] <- H + dH
+#   Y.simu3[i] <- Y + dY
+# }
+# plot(x = Aset, y = X.simu3)
+```
+
+
+Question 1: Does host competency matter for bm and bb?
+```{r Q1 BM N is constant, change competency A for each host}
+
+#########################
+# PERO : N = 50; A = .9
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero1<- NaN*tset; T.simu.bm.pero1[1] <-T0
+X.simu.bm.pero1<- NaN*tset; X.simu.bm.pero1[1] <-X0
+H.simu.bm.pero1<- NaN*tset; H.simu.bm.pero1[1] <-H0
+Y.simu.bm.pero1<- NaN*tset; Y.simu.bm.pero1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero1[i-1]
+  X <- X.simu.bm.pero1[i-1]
+  H <- H.simu.bm.pero1[i-1]
+  Y <- Y.simu.bm.pero1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero1[i] <- T + dT
+  X.simu.bm.pero1[i] <- X + dX
+  H.simu.bm.pero1[i] <- H + dH
+  Y.simu.bm.pero1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50')
+
+
+#########################
+# NEFU : N = 50; A = .3
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu1<- NaN*tset; T.simu.bm.nefu1[1] <-T0
+X.simu.bm.nefu1<- NaN*tset; X.simu.bm.nefu1[1] <-X0
+H.simu.bm.nefu1<- NaN*tset; H.simu.bm.nefu1[1] <-H0
+Y.simu.bm.nefu1<- NaN*tset; Y.simu.bm.nefu1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu1[i-1]
+  X <- X.simu.bm.nefu1[i-1]
+  H <- H.simu.bm.nefu1[i-1]
+  Y <- Y.simu.bm.nefu1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu1[i] <- T + dT
+  X.simu.bm.nefu1[i] <- X + dX
+  H.simu.bm.nefu1[i] <- H + dH
+  Y.simu.bm.nefu1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 50')
+
+
+#########################
+# SCOC : N = 50; A = .5
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc1<- NaN*tset; T.simu.bm.scoc1[1] <-T0
+X.simu.bm.scoc1<- NaN*tset; X.simu.bm.scoc1[1] <-X0
+H.simu.bm.scoc1<- NaN*tset; H.simu.bm.scoc1[1] <-H0
+Y.simu.bm.scoc1<- NaN*tset; Y.simu.bm.scoc1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc1[i-1]
+  X <- X.simu.bm.scoc1[i-1]
+  H <- H.simu.bm.scoc1[i-1]
+  Y <- Y.simu.bm.scoc1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc1[i] <- T + dT
+  X.simu.bm.scoc1[i] <- X + dX
+  H.simu.bm.scoc1[i] <- H + dH
+  Y.simu.bm.scoc1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero1, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of BM Infected Ticks by Host Blood Meal (N = 50)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc1, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu1, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: A = 0.9', 'NEFU: A = 0.3', 'SCOC: A = 0.5'), lwd = c(3,2,1),
+       col = 'maroon')
+
+```
+
+
+
+
+```{r Q1 BB N is constant, changing competency A for each host }
+
+#########################
+# PERO : N = 50; A = .6
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.6 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.pero1<- NaN*tset; T.simu.bb.pero1[1] <-T0
+X.simu.bb.pero1<- NaN*tset; X.simu.bb.pero1[1] <-X0
+H.simu.bb.pero1<- NaN*tset; H.simu.bb.pero1[1] <-H0
+Y.simu.bb.pero1<- NaN*tset; Y.simu.bb.pero1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.pero1[i-1]
+  X <- X.simu.bb.pero1[i-1]
+  H <- H.simu.bb.pero1[i-1]
+  Y <- Y.simu.bb.pero1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.pero1[i] <- T + dT
+  X.simu.bb.pero1[i] <- X + dX
+  H.simu.bb.pero1[i] <- H + dH
+  Y.simu.bb.pero1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.pero1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BB: PERO A = .6, N = 50')
+
+
+#########################
+# NEFU : N = 50; A = .9
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.nefu1<- NaN*tset; T.simu.bb.nefu1[1] <-T0
+X.simu.bb.nefu1<- NaN*tset; X.simu.bb.nefu1[1] <-X0
+H.simu.bb.nefu1<- NaN*tset; H.simu.bb.nefu1[1] <-H0
+Y.simu.bb.nefu1<- NaN*tset; Y.simu.bb.nefu1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.nefu1[i-1]
+  X <- X.simu.bb.nefu1[i-1]
+  H <- H.simu.bb.nefu1[i-1]
+  Y <- Y.simu.bb.nefu1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.nefu1[i] <- T + dT
+  X.simu.bb.nefu1[i] <- X + dX
+  H.simu.bb.nefu1[i] <- H + dH
+  Y.simu.bb.nefu1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.nefu1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BB: NEFU A = .9, N = 50')
+
+
+#########################
+# SCOC : N = 50; A = .001
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.001 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.scoc1<- NaN*tset; T.simu.bb.scoc1[1] <-T0
+X.simu.bb.scoc1<- NaN*tset; X.simu.bb.scoc1[1] <-X0
+H.simu.bb.scoc1<- NaN*tset; H.simu.bb.scoc1[1] <-H0
+Y.simu.bb.scoc1<- NaN*tset; Y.simu.bb.scoc1[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.scoc1[i-1]
+  X <- X.simu.bb.scoc1[i-1]
+  H <- H.simu.bb.scoc1[i-1]
+  Y <- Y.simu.bb.scoc1[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.scoc1[i] <- T + dT
+  X.simu.bb.scoc1[i] <- X + dX
+  H.simu.bb.scoc1[i] <- H + dH
+  Y.simu.bb.scoc1[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.scoc1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .001, N = 50')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bb.pero1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of BB Infected Ticks by Host Blood Meal (N = 50)',
+     col = 'royalblue',
+     ylim = c(0, 120))
+lines(x = tset, y = X.simu.bb.scoc1, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu1, lwd = 3,col = 'royalblue')
+legend('topright', legend = c('NEFU: A = 0.9','PERO: A = 0.6', 'SCOC: A = 0.001'), lwd = c(3,2,1),
+       col = 'royalblue')
+
+```
+
+
+
+
+
+
+
+Question 1 ANSWER
+```{r Q1 COMPARING host competency for BM and BB with densities equal}
+#par(mfrow = c(1,1))
+
+#BM
+plot(x = tset, y = X.simu.bm.pero1, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = c('Number of Infected Ticks Produced by', paste('Differing Host Competencies (N = 50)')), cex.main = 1.1,
+     col = 'maroon', lty = 1)
+lines(x = tset, y = X.simu.bm.scoc1, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu1, lwd = 1,col = 'maroon')
+#legend('topright', legend = c('PERO: A = .9', 'NEFU: A = .3', 'SCOC: A = .5'), lwd = c(3,2,1),col = 'maroon')
+# BB
+lines(x = tset, y = X.simu.bb.pero1, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'Number of BB Infected Ticks by Host Blood Meal (N = 50)',
+     col = 'royalblue',
+     ylim = c(0, 120))
+lines(x = tset, y = X.simu.bb.scoc1, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu1, lwd = 3,col = 'royalblue', lty = 3)
+#legend('topright', legend = c('NEFU: A = .9','PERO: A = .6', 'SCOC: A = .001'), lwd = c(3,2,1),col = 'royalblue')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1))
+
+
+
+##### TRY PROPORTION ########
+# for BM
+Vsimu1pero <- X.simu.bm.pero1 + T.simu.bm.pero1
+Vsimu1nefu <- X.simu.bm.nefu1 + T.simu.bm.nefu1
+Vsimu1scoc <- X.simu.bm.scoc1 + T.simu.bm.scoc1
+## Try hosts
+plot(x = tset, y = X.simu.bm.pero1/Vsimu1pero, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Proportion of Infected Ticks',
+     main = c('Proportion of Infected Ticks Produced by', paste('Differing Host Competencies (N = 50)')), cex.main = 1.1, xlim = c(0, 30),
+     col = 'maroon', lty = 1)
+lines(x = tset, y = X.simu.bm.scoc1/Vsimu1nefu, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu1/Vsimu1scoc, lwd = 1,col = 'maroon')
+#legend('topright', legend = c('PERO: A = .9', 'NEFU: A = .3', 'SCOC: A = .5'), lwd = c(3,2,1),col = 'maroon')
+
+# for BB
+Vsimu1pero <- X.simu.bb.pero1 + T.simu.bb.pero1
+Vsimu1nefu <- X.simu.bb.nefu1 + T.simu.bb.nefu1
+Vsimu1scoc <- X.simu.bb.scoc1 + T.simu.bb.scoc1
+## Try hosts
+lines(x = tset, y = X.simu.bb.pero1/Vsimu1pero, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Proportion Infected Ticks',
+     main = c('Number of Infected Ticks Produced by', paste('Differing Host Competencies (N = 50)')), cex.main = .6,
+     col = 'royalblue', lty = 1)
+lines(x = tset, y = X.simu.bb.scoc1/Vsimu1nefu, lwd = 2, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu1/Vsimu1scoc, lwd = 1,col = 'royalblue')
+#legend('topright', legend = c('PERO: A = .9', 'NEFU: A = .3', 'SCOC: A = .5'), lwd = c(3,2,1),col = 'maroon')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1))
+
+
+
+
+#### Analyzing Q1 ###
+## Calculating the max infected ticks for bb
+bb_nefu1<-max(X.simu.bb.nefu1)
+bb_pero1<-max(X.simu.bb.pero1)
+bb_scoc1<-max(X.simu.bb.scoc1)
+
+bb_max1 <- bb_nefu1 + bb_pero1 + bb_scoc1 # 187.0387
+
+## Calculating the sum infected ticks for bb
+bb_nefu1<-sum(X.simu.bb.nefu1)
+bb_pero1<-sum(X.simu.bb.pero1)
+bb_scoc1<-sum(X.simu.bb.scoc1)
+
+bb_sum1 <- bb_nefu1 + bb_pero1 + bb_scoc1
+
+
+## Calculating the max infected ticks for bm
+bm_nefu1<-max(X.simu.bm.nefu1)
+bm_pero1<-max(X.simu.bm.pero1)
+bm_scoc1<-max(X.simu.bm.scoc1)
+
+bm_max1 <- bm_nefu1 + bm_pero1 + bm_scoc1 # 229.9854
+
+
+## Calculating the max infected ticks for bm
+bm_nefu1<-sum(X.simu.bm.nefu1)
+bm_pero1<-sum(X.simu.bm.pero1)
+bm_scoc1<-sum(X.simu.bm.scoc1)
+
+bm_sum1 <- bm_nefu1 + bm_pero1 + bm_scoc1
+
+```
+
+
+Question 2: or is host density more important?
+
+```{r Q2 BM actual host numbers and competency}
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero2<- NaN*tset; T.simu.bm.pero2[1] <-T0
+X.simu.bm.pero2<- NaN*tset; X.simu.bm.pero2[1] <-X0
+H.simu.bm.pero2<- NaN*tset; H.simu.bm.pero2[1] <-H0
+Y.simu.bm.pero2<- NaN*tset; Y.simu.bm.pero2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero2[i-1]
+  X <- X.simu.bm.pero2[i-1]
+  H <- H.simu.bm.pero2[i-1]
+  Y <- Y.simu.bm.pero2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero2[i] <- T + dT
+  X.simu.bm.pero2[i] <- X + dX
+  H.simu.bm.pero2[i] <- H + dH
+  Y.simu.bm.pero2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu2<- NaN*tset; T.simu.bm.nefu2[1] <-T0
+X.simu.bm.nefu2<- NaN*tset; X.simu.bm.nefu2[1] <-X0
+H.simu.bm.nefu2<- NaN*tset; H.simu.bm.nefu2[1] <-H0
+Y.simu.bm.nefu2<- NaN*tset; Y.simu.bm.nefu2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu2[i-1]
+  X <- X.simu.bm.nefu2[i-1]
+  H <- H.simu.bm.nefu2[i-1]
+  Y <- Y.simu.bm.nefu2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu2[i] <- T + dT
+  X.simu.bm.nefu2[i] <- X + dX
+  H.simu.bm.nefu2[i] <- H + dH
+  Y.simu.bm.nefu2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc2<- NaN*tset; T.simu.bm.scoc2[1] <-T0
+X.simu.bm.scoc2<- NaN*tset; X.simu.bm.scoc2[1] <-X0
+H.simu.bm.scoc2<- NaN*tset; H.simu.bm.scoc2[1] <-H0
+Y.simu.bm.scoc2<- NaN*tset; Y.simu.bm.scoc2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc2[i-1]
+  X <- X.simu.bm.scoc2[i-1]
+  H <- H.simu.bm.scoc2[i-1]
+  Y <- Y.simu.bm.scoc2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc2[i] <- T + dT
+  X.simu.bm.scoc2[i] <- X + dX
+  H.simu.bm.scoc2[i] <- H + dH
+  Y.simu.bm.scoc2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero2, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc2, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu2, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+```
+
+
+
+
+
+
+```{r Q2 BB actual host numbers and competency}
+
+#########################
+# PERO : N = 26; A = .6
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.6 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.pero2<- NaN*tset; T.simu.bb.pero2[1] <-T0
+X.simu.bb.pero2<- NaN*tset; X.simu.bb.pero2[1] <-X0
+H.simu.bb.pero2<- NaN*tset; H.simu.bb.pero2[1] <-H0
+Y.simu.bb.pero2<- NaN*tset; Y.simu.bb.pero2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.pero2[i-1]
+  X <- X.simu.bb.pero2[i-1]
+  H <- H.simu.bb.pero2[i-1]
+  Y <- Y.simu.bb.pero2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.pero2[i] <- T + dT
+  X.simu.bb.pero2[i] <- X + dX
+  H.simu.bb.pero2[i] <- H + dH
+  Y.simu.bb.pero2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.pero2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BB: PERO A = .6, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .9
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.nefu2<- NaN*tset; T.simu.bb.nefu2[1] <-T0
+X.simu.bb.nefu2<- NaN*tset; X.simu.bb.nefu2[1] <-X0
+H.simu.bb.nefu2<- NaN*tset; H.simu.bb.nefu2[1] <-H0
+Y.simu.bb.nefu2<- NaN*tset; Y.simu.bb.nefu2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.nefu2[i-1]
+  X <- X.simu.bb.nefu2[i-1]
+  H <- H.simu.bb.nefu2[i-1]
+  Y <- Y.simu.bb.nefu2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.nefu2[i] <- T + dT
+  X.simu.bb.nefu2[i] <- X + dX
+  H.simu.bb.nefu2[i] <- H + dH
+  Y.simu.bb.nefu2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.nefu2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BB: NEFU A = .9, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .001
+#########################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.001 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.scoc2<- NaN*tset; T.simu.bb.scoc2[1] <-T0
+X.simu.bb.scoc2<- NaN*tset; X.simu.bb.scoc2[1] <-X0
+H.simu.bb.scoc2<- NaN*tset; H.simu.bb.scoc2[1] <-H0
+Y.simu.bb.scoc2<- NaN*tset; Y.simu.bb.scoc2[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.scoc2[i-1]
+  X <- X.simu.bb.scoc2[i-1]
+  H <- H.simu.bb.scoc2[i-1]
+  Y <- Y.simu.bb.scoc2[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.scoc2[i] <- T + dT
+  X.simu.bb.scoc2[i] <- X + dX
+  H.simu.bb.scoc2[i] <- H + dH
+  Y.simu.bb.scoc2[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.scoc2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .001, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bb.pero2, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of BB Infected Ticks by Host Blood Meal',
+     col = 'royalblue',
+     ylim = c(0, 130))
+lines(x = tset, y = X.simu.bb.scoc2, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu2, lwd = 3,col = 'royalblue')
+legend('topright', legend = c('NEFU: N = 20, A = 0.9','PERO: N = 26, A = 0.6', 'SCOC: N = 35, A = 0.001'), lwd = c(3,2,1),
+      col = 'royalblue')
+```
+
+
+
+Question 2 ANSWER
+```{r COMPARING BM and BB with actual numbers and competency}
+# BM
+plot(x = tset, y = X.simu.bm.pero2, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = c('Number of Infeced Ticks by Host', paste('(Competency + Abundance)')),
+     col = 'maroon',
+     ylim = c(0,130), cex.main = .8)
+lines(x = tset, y = X.simu.bm.scoc2, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu2, lwd = 1,col = 'maroon')
+abline(v = max(X.simu.bm.pero2), col = 'blue', lty = 3)
+?abline()
+#legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),col = 'maroon')
+# BB
+lines(x = tset, y = X.simu.bb.pero2, type = 'l', las = 1, lwd = 2, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.scoc2, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu2, lwd = 3,col = 'royalblue')
+#legend('topright', legend = c('NEFU: N = 20, A = .9','PERO: N = 26, A = .6', 'SCOC: N = 35, A = .001'), lwd = c(3,2,1),col = 'royalblue')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1))
+
+
+########### Proportions ###############
+
+Vsimu2pero <- X.simu.bm.pero2 + T.simu.bm.pero2
+Vsimu2nefu <- X.simu.bm.nefu2 + T.simu.bm.nefu2
+Vsimu2scoc <- X.simu.bm.scoc2 + T.simu.bm.scoc2
+# BM
+plot(x = tset, y = X.simu.bm.pero2/Vsimu2pero, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Proportion of Infected Ticks',
+     main = c('Proportion of Infeced Ticks by Host', paste('(Competency + Abundance)')),
+     col = 'maroon',
+     ylim = c(0,1), cex.main = .8, xlim = c(0,30))
+lines(x = tset, y = X.simu.bm.scoc2/Vsimu2nefu, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu2/Vsimu2scoc, lwd = 1,col = 'maroon')
+#legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),col = 'maroon')
+# BB
+lines(x = tset, y = X.simu.bb.pero2/Vsimu2pero, type = 'l', las = 1, lwd = 2, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.scoc2/Vsimu2scoc, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu2/Vsimu2nefu, lwd = 3,col = 'royalblue')
+#legend('topright', legend = c('NEFU: N = 20, A = .9','PERO: N = 26, A = .6', 'SCOC: N = 35, A = .001'), lwd = c(3,2,1),col = 'royalblue')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1))
+
+
+#### Analyzing Q2 ###
+## Calculating the max infected ticks for bb
+bb_nefu2<-max(X.simu.bb.nefu2)
+bb_pero2<-max(X.simu.bb.pero2)
+bb_scoc2<-max(X.simu.bb.scoc2)
+
+bb_max2 <- bb_nefu2 + bb_pero2 + bb_scoc2 # 224.3267
+
+## Calculating the sum infected ticks for bb
+bb_nefu2<-sum(X.simu.bb.nefu2)
+bb_pero2<-sum(X.simu.bb.pero2)
+bb_scoc2<-sum(X.simu.bb.scoc2)
+
+bb_sum2 <- bb_nefu2 + bb_pero2 + bb_scoc2
+
+
+## Calculating the max infected ticks for bm
+bm_nefu2<-max(X.simu.bm.nefu2)
+bm_pero2<-max(X.simu.bm.pero2)
+bm_scoc2<-max(X.simu.bm.scoc2)
+
+bm_max2 <- bm_nefu2 + bm_pero2 + bm_scoc2 # 278.53
+
+## Calculating the max infected ticks for bm
+bm_nefu2<-sum(X.simu.bm.nefu2)
+bm_pero2<-sum(X.simu.bm.pero2)
+bm_scoc2<-sum(X.simu.bm.scoc2)
+
+bm_sum2 <- bm_nefu2 + bm_pero2 + bm_scoc2
+
+```
+
+```{r making data tables}
+
+library(knitr)
+library(ggplot2)
+
+## Making data table
+sum <- c(bm_sum1,bb_sum1,bm_sum2,bb_sum2)
+max <- c(bm_max1,bb_max1,bm_max2,bb_max2)
+pathogen <- c('BM', 'BB','BM', 'BB')
+question <- c('1','1', '2','2')
+
+# entire data table
+analysis <- data.frame(pathogen,question, sum, max)
+colnames(analysis) = c('Pathogen', 'Question', 'Sum Infected Ticks', 'Max Infected Ticks')
+str(analysis)
+#View(analysis)
+
+?kable
+kable(analysis, digits= 1, align = 'c',
+      format.args = list(big.mark = ',', scientific = FALSE))
+
+analysis1 <- analysis[1:2,-2]
+View(analysis1)
+kable(analysis1, digits= 1, align = 'c',
+      format.args = list(big.mark = ',', scientific = FALSE))
+```
+
+
+Question 3:
+
+```{r change M to reflect host}
+######### M = ######
+
+#########################
+# PERO : N = 26; A = .9; M = 10
+#########################
+  b = .1 # birth rate ticks
+  M = 10 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3; M = 25
+#########################
+  b = .1 # birth rate ticks
+  M = 25 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5; M = 50
+#########################
+  b = .1 # birth rate ticks
+  M = 50 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+
+
+
+############## BB #################
+
+#########################
+# PERO : N = 26; A = .6; M = 10
+#########################
+  b = .1 # birth rate ticks
+  M = 10 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.6 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.pero3<- NaN*tset; T.simu.bb.pero3[1] <-T0
+X.simu.bb.pero3<- NaN*tset; X.simu.bb.pero3[1] <-X0
+H.simu.bb.pero3<- NaN*tset; H.simu.bb.pero3[1] <-H0
+Y.simu.bb.pero3<- NaN*tset; Y.simu.bb.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.pero3[i-1]
+  X <- X.simu.bb.pero3[i-1]
+  H <- H.simu.bb.pero3[i-1]
+  Y <- Y.simu.bb.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.pero3[i] <- T + dT
+  X.simu.bb.pero3[i] <- X + dX
+  H.simu.bb.pero3[i] <- H + dH
+  Y.simu.bb.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BB: PERO A = .6, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .9; M = 25
+#########################
+  b = .1 # birth rate ticks
+  M = 25 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.nefu3<- NaN*tset; T.simu.bb.nefu3[1] <-T0
+X.simu.bb.nefu3<- NaN*tset; X.simu.bb.nefu3[1] <-X0
+H.simu.bb.nefu3<- NaN*tset; H.simu.bb.nefu3[1] <-H0
+Y.simu.bb.nefu3<- NaN*tset; Y.simu.bb.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.nefu3[i-1]
+  X <- X.simu.bb.nefu3[i-1]
+  H <- H.simu.bb.nefu3[i-1]
+  Y <- Y.simu.bb.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.nefu3[i] <- T + dT
+  X.simu.bb.nefu3[i] <- X + dX
+  H.simu.bb.nefu3[i] <- H + dH
+  Y.simu.bb.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BB: NEFU A = .9, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .001; M = 50
+#########################
+  b = .1 # birth rate ticks
+  M = 50 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.001 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bb.scoc3<- NaN*tset; T.simu.bb.scoc3[1] <-T0
+X.simu.bb.scoc3<- NaN*tset; X.simu.bb.scoc3[1] <-X0
+H.simu.bb.scoc3<- NaN*tset; H.simu.bb.scoc3[1] <-H0
+Y.simu.bb.scoc3<- NaN*tset; Y.simu.bb.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bb.scoc3[i-1]
+  X <- X.simu.bb.scoc3[i-1]
+  H <- H.simu.bb.scoc3[i-1]
+  Y <- Y.simu.bb.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bb.scoc3[i] <- T + dT
+  X.simu.bb.scoc3[i] <- X + dX
+  H.simu.bb.scoc3[i] <- H + dH
+  Y.simu.bb.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bb.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .001, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bb.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of BB Infected Ticks by Host Blood Meal',
+     col = 'royalblue',
+     ylim = c(0, 130))
+lines(x = tset, y = X.simu.bb.scoc3, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu3, lwd = 3,col = 'royalblue')
+legend('topright', legend = c('NEFU: N = 20, A = 0.9','PERO: N = 26, A = 0.6', 'SCOC: N = 35, A = 0.001'), lwd = c(3,2,1),
+      col = 'royalblue')
+
+
+
+# BM
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = c('Number of Infeced Ticks by Host', paste('(Competency + Abundance + Burden)')),
+     col = 'maroon',
+     ylim = c(0,120), cex.main = .8)
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+abline(v = max(X.simu.bm.pero3), col = 'blue', lty = 3)
+?abline()
+#legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),col = 'maroon')
+# BB
+lines(x = tset, y = X.simu.bb.pero3, type = 'l', las = 1, lwd = 2, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.scoc3, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu3, lwd = 3,col = 'royalblue')
+#legend('topright', legend = c('NEFU: N = 20, A = .9','PERO: N = 26, A = .6', 'SCOC: N = 35, A = .001'), lwd = c(3,2,1),col = 'royalblue')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1), cex = .7)
+
+
+########### Proportions ###############
+
+Vsimu2pero <- X.simu.bm.pero3 + T.simu.bm.pero3
+Vsimu2nefu <- X.simu.bm.nefu3 + T.simu.bm.nefu3
+Vsimu2scoc <- X.simu.bm.scoc3 + T.simu.bm.scoc3
+# BM
+plot(x = tset, y = X.simu.bm.pero3/Vsimu2pero, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Proportion of Infected Ticks',
+     main = c('Proportion of Infeced Ticks by Host', paste('(Competency + Abundance + Burden)')),
+     col = 'maroon',
+     ylim = c(0,1), cex.main = .8, xlim = c(0,30))
+lines(x = tset, y = X.simu.bm.scoc3/Vsimu2nefu, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3/Vsimu2scoc, lwd = 1,col = 'maroon')
+#legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),col = 'maroon')
+# BB
+lines(x = tset, y = X.simu.bb.pero3/Vsimu2pero, type = 'l', las = 1, lwd = 2, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.scoc3/Vsimu2scoc, lwd = 1, col = 'royalblue')
+lines(x = tset, y = X.simu.bb.nefu3/Vsimu2nefu, lwd = 3,col = 'royalblue')
+#legend('topright', legend = c('NEFU: N = 20, A = .9','PERO: N = 26, A = .6', 'SCOC: N = 35, A = .001'), lwd = c(3,2,1),col = 'royalblue')
+legend('topright', legend = c('BM', 'BB','High', 'Medium', 'Low'),
+       col = c('maroon', 'royalblue', 'black','black','black'),
+       lwd = c(3,3,3,2,1), cex = .7)
+
+
+#### Analyzing Q2 ###
+## Calculating the max infected ticks for bb
+bb_nefu3<-max(X.simu.bb.nefu3)
+bb_pero3<-max(X.simu.bb.pero3)
+bb_scoc3<-max(X.simu.bb.scoc3)
+
+bb_max2 <- bb_nefu3 + bb_pero3 + bb_scoc3 # 224.4003
+
+## Calculating the sum infected ticks for bb
+bb_nefu3<-sum(X.simu.bb.nefu3)
+bb_pero3<-sum(X.simu.bb.pero3)
+bb_scoc3<-sum(X.simu.bb.scoc3)
+
+bb_sum2 <- bb_nefu3 + bb_pero3 + bb_scoc3
+
+
+## Calculating the max infected ticks for bm
+bm_nefu3<-max(X.simu.bm.nefu3)
+bm_pero3<-max(X.simu.bm.pero3)
+bm_scoc3<-max(X.simu.bm.scoc3)
+
+bm_max2 <- bm_nefu3 + bm_pero3 + bm_scoc3  # 278.552
+
+## Calculating the max infected ticks for bm
+bm_nefu3<-sum(X.simu.bm.nefu3)
+bm_pero3<-sum(X.simu.bm.pero3)
+bm_scoc3<-sum(X.simu.bm.scoc3)
+
+bm_sum2 <- bm_nefu3 + bm_pero3 + bm_scoc3
+
+
+```
+
+
+
+```{r Q3 NOT THIS ONEhost-tick interactions changing T0}
+
+##################### T0 = 500 #############################
+
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 750)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+####################### T0 = 750 ######################################
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 750)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+
+############################ T0 = 250 ###########################
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 250)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+```
+
+
+
+
+```{r changed T0 and v = .9}
+##################### T0 = 500 #############################
+
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 499 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 750)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+####################### T0 = 750 ######################################
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 749 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 750)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+
+############################ T0 = 250 ###########################
+
+#########################
+# PERO : N = 26; A = .9
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 25 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero3<- NaN*tset; T.simu.bm.pero3[1] <-T0
+X.simu.bm.pero3<- NaN*tset; X.simu.bm.pero3[1] <-X0
+H.simu.bm.pero3<- NaN*tset; H.simu.bm.pero3[1] <-H0
+Y.simu.bm.pero3<- NaN*tset; Y.simu.bm.pero3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero3[i-1]
+  X <- X.simu.bm.pero3[i-1]
+  H <- H.simu.bm.pero3[i-1]
+  Y <- Y.simu.bm.pero3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero3[i] <- T + dT
+  X.simu.bm.pero3[i] <- X + dX
+  H.simu.bm.pero3[i] <- H + dH
+  Y.simu.bm.pero3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 26')
+
+
+#########################
+# NEFU : N = 20; A = .3
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.3 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 19 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.nefu3<- NaN*tset; T.simu.bm.nefu3[1] <-T0
+X.simu.bm.nefu3<- NaN*tset; X.simu.bm.nefu3[1] <-X0
+H.simu.bm.nefu3<- NaN*tset; H.simu.bm.nefu3[1] <-H0
+Y.simu.bm.nefu3<- NaN*tset; Y.simu.bm.nefu3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.nefu3[i-1]
+  X <- X.simu.bm.nefu3[i-1]
+  H <- H.simu.bm.nefu3[i-1]
+  Y <- Y.simu.bm.nefu3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.nefu3[i] <- T + dT
+  X.simu.bm.nefu3[i] <- X + dX
+  H.simu.bm.nefu3[i] <- H + dH
+  Y.simu.bm.nefu3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.nefu3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: NEFU A = .3, N = 20')
+
+
+#########################
+# SCOC : N = 35; A = .5
+#########################
+  b = .01 # birth rate ticks
+  M = 100 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 249 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 34 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.scoc3<- NaN*tset; T.simu.bm.scoc3[1] <-T0
+X.simu.bm.scoc3<- NaN*tset; X.simu.bm.scoc3[1] <-X0
+H.simu.bm.scoc3<- NaN*tset; H.simu.bm.scoc3[1] <-H0
+Y.simu.bm.scoc3<- NaN*tset; Y.simu.bm.scoc3[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.scoc3[i-1]
+  X <- X.simu.bm.scoc3[i-1]
+  H <- H.simu.bm.scoc3[i-1]
+  Y <- Y.simu.bm.scoc3[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.scoc3[i] <- T + dT
+  X.simu.bm.scoc3[i] <- X + dX
+  H.simu.bm.scoc3[i] <- H + dH
+  Y.simu.bm.scoc3[i] <- Y + dY
+}
+
+plot(x = tset, y = X.simu.bm.scoc3, type = 'l', las = 1, lwd = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'BM: SCOC A = .5, N = 35')
+
+
+### PLOT ALL 3 species
+plot(x = tset, y = X.simu.bm.pero3, type = 'l', las = 1, lwd = 3,
+     xlab = 'Time (Days)', ylab = 'Number of Infected Ticks',
+     main = 'Number of Infected BM Ticks by Host Blood Meal (V = 250)',
+     col = 'maroon')
+lines(x = tset, y = X.simu.bm.scoc3, lwd = 2, col = 'maroon')
+lines(x = tset, y = X.simu.bm.nefu3, lwd = 1,col = 'maroon')
+legend('topright', legend = c('PERO: N = 26, A = 0.9','SCOC: N = 35, A = 0.5', 'NEFU: N = 20, A = 0.3'), lwd = c(3,2,1),
+       col = 'maroon')
+
+max(Y.simu.bm.pero3)
+max(Y.simu.bm.nefu3)
+max(Y.simu.bm.scoc3)
+```
+
+
+
+ANALYSIS
+```{r 279 ANALYSIS}
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero10<- NaN*tset; T.simu.bm.pero10[1] <-T0
+X.simu.bm.pero10<- NaN*tset; X.simu.bm.pero10[1] <-X0
+H.simu.bm.pero10<- NaN*tset; H.simu.bm.pero10[1] <-H0
+Y.simu.bm.pero10<- NaN*tset; Y.simu.bm.pero10[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero10[i-1]
+  X <- X.simu.bm.pero10[i-1]
+  H <- H.simu.bm.pero10[i-1]
+  Y <- Y.simu.bm.pero10[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero10[i] <- T + dT
+  X.simu.bm.pero10[i] <- X + dX
+  H.simu.bm.pero10[i] <- H + dH
+  Y.simu.bm.pero10[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero10, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero10, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero10, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero10, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+X.simu.bm.pero10[length(tset)]
+####### What are max amount of infected? ###########
+max(X.simu.bm.pero10) # max ticks
+max(Y.simu.bm.pero10) # max hosts
+
+
+######## What proportion of the population had been sick at some point? ##########
+
+# N = H + Y --> N - H = Y
+(N - H.simu.bm.pero10[length(tset)]) / N # hosts
+
+plot(x = tset, y = Y.simu.bm.pero10/N, lwd = 2, type = 'l', col = 'maroon',
+     ylab = 'Proportion of Infected Hosts', xlab = 'Time (Days)',
+     main = 'Proportion of Infected Hosts vs. Time')
+
+# V = T + X --> V - T = X
+(V - T.simu.bm.pero10[length(tset)]) / V # ticks
+plot(x = tset, y = X.simu.bm.pero10/V, main = 'Need to fix tick proportion')
+
+
+
+############ When was rate of transmision highest? ##############
+
+### with these parameters
+ b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+####
+  
+  
+# rate of transmission = dY/dt #hosts
+# dY/dt = (A_hat*H*X)/(H + Y)
+
+
+NewInfec <- (A_hat * H.simu.bm.pero10 *X.simu.bm.pero10)/ (H.simu.bm.pero10 + Y.simu.bm.pero10)
+plot(x = tset, y = NewInfec, lwd = 2, type = 'l', las = 1, 
+     ylab = 'New Infections', xlab = 'Time (Days)')
+max.NewInfec <- max(NewInfec)
+for(i in 1:length(tset)) {
+  if(NewInfec[i]== max.NewInfec){
+    T.maxnewinf <- tset[i]
+  }
+}
+T.maxnewinf
+abline(v = T.maxnewinf, lty = 2)
+legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+
+
+
+
+
+
+
+
+
+
+
+
+
+# rate of transmission = dX/dt # ticks
+
+############## What is R0 for this disease when it first enters the population? #########
+
+R0 <- ((A_hat * H.simu.bm.pero10)/(H.simu.bm.pero10 + Y.simu.bm.pero10))*(1/g)
+
+
+############## How does R0 change as beta increases? ###########
+
+A_hat_set <- seq(0.01, .5, length.out = 10000)
+
+R0_set <- ((A_hat_set * H.simu.bm.pero10)/(H.simu.bm.pero10 + Y.simu.bm.pero10))*(1/g)
+
+
+plot(x = A_hat_set, y = R0_set, type = 'l', 
+     xlab = 'Infectiousness (A_hat: Tick to Host)', ylab = 'Basic Reproductive Number (R0)',
+     las = 1, lwd = 2,
+     main = 'R0 in Host Population')
+
+
+
+############## Incidence graphs (dY/dt) over time change #############
+
+# change beta and gamma and v
+###########################################
+ # v = .00001
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .0001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero11<- NaN*tset; T.simu.bm.pero11[1] <-T0
+X.simu.bm.pero11<- NaN*tset; X.simu.bm.pero11[1] <-X0
+H.simu.bm.pero11<- NaN*tset; H.simu.bm.pero11[1] <-H0
+Y.simu.bm.pero11<- NaN*tset; Y.simu.bm.pero11[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero11[i-1]
+  X <- X.simu.bm.pero11[i-1]
+  H <- H.simu.bm.pero11[i-1]
+  Y <- Y.simu.bm.pero11[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero11[i] <- T + dT
+  X.simu.bm.pero11[i] <- X + dX
+  H.simu.bm.pero11[i] <- H + dH
+  Y.simu.bm.pero11[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero11, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero11, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero11, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero11, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # v = .1
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .1 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero12<- NaN*tset; T.simu.bm.pero12[1] <-T0
+X.simu.bm.pero12<- NaN*tset; X.simu.bm.pero12[1] <-X0
+H.simu.bm.pero12<- NaN*tset; H.simu.bm.pero12[1] <-H0
+Y.simu.bm.pero12<- NaN*tset; Y.simu.bm.pero12[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero12[i-1]
+  X <- X.simu.bm.pero12[i-1]
+  H <- H.simu.bm.pero12[i-1]
+  Y <- Y.simu.bm.pero12[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero12[i] <- T + dT
+  X.simu.bm.pero12[i] <- X + dX
+  H.simu.bm.pero12[i] <- H + dH
+  Y.simu.bm.pero12[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero12, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero12, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero12, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero12, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # v = .9
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero13<- NaN*tset; T.simu.bm.pero13[1] <-T0
+X.simu.bm.pero13<- NaN*tset; X.simu.bm.pero13[1] <-X0
+H.simu.bm.pero13<- NaN*tset; H.simu.bm.pero13[1] <-H0
+Y.simu.bm.pero13<- NaN*tset; Y.simu.bm.pero13[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero13[i-1]
+  X <- X.simu.bm.pero13[i-1]
+  H <- H.simu.bm.pero13[i-1]
+  Y <- Y.simu.bm.pero13[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero13[i] <- T + dT
+  X.simu.bm.pero13[i] <- X + dX
+  H.simu.bm.pero13[i] <- H + dH
+  Y.simu.bm.pero13[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero13, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero13, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero13, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero13, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+
+
+######### Plot change in v #################
+# plot change of infected hosts
+plot(x = tset, y = Y.simu.bm.pero11, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected Hosts',
+     main = 'Incidence of Hosts (changing v)',
+     ylim = c(0, 50), xlim = c(0, 60))
+lines(x = tset, y = Y.simu.bm.pero12, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero13, col = Hcol, lwd = 2, lty = 1)
+legend('topright', legend = c('v = .001', 'v = .1','v = .9'), col = 'maroon',
+        lty = 1, lwd = 2, cex = 0.9)
+
+# Plot change of infected ticks
+plot(x = tset, y = X.simu.bm.pero11, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'Incidence of Ticks (changing v)',
+     ylim = c(0, 120), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero12, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = X.simu.bm.pero13, col = Hcol, lwd = 2, lty = 1)
+legend('topright', legend = c('v = .001', 'v = .1','v = .9'), col = 'maroon',
+        lty = 1, lwd = 2, cex = 0.9)
+
+
+
+
+
+
+
+################ Changing A_hat ################
+
+
+
+###########################################
+ # A_hat = .01
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.01 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero14<- NaN*tset; T.simu.bm.pero14[1] <-T0
+X.simu.bm.pero14<- NaN*tset; X.simu.bm.pero14[1] <-X0
+H.simu.bm.pero14<- NaN*tset; H.simu.bm.pero14[1] <-H0
+Y.simu.bm.pero14<- NaN*tset; Y.simu.bm.pero14[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero14[i-1]
+  X <- X.simu.bm.pero14[i-1]
+  H <- H.simu.bm.pero14[i-1]
+  Y <- Y.simu.bm.pero14[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero14[i] <- T + dT
+  X.simu.bm.pero14[i] <- X + dX
+  H.simu.bm.pero14[i] <- H + dH
+  Y.simu.bm.pero14[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero14, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A_hat = .01',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero14, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero14, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero14, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # A_hat = .1
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.1 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero15<- NaN*tset; T.simu.bm.pero15[1] <-T0
+X.simu.bm.pero15<- NaN*tset; X.simu.bm.pero15[1] <-X0
+H.simu.bm.pero15<- NaN*tset; H.simu.bm.pero15[1] <-H0
+Y.simu.bm.pero15<- NaN*tset; Y.simu.bm.pero15[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero15[i-1]
+  X <- X.simu.bm.pero15[i-1]
+  H <- H.simu.bm.pero15[i-1]
+  Y <- Y.simu.bm.pero15[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero15[i] <- T + dT
+  X.simu.bm.pero15[i] <- X + dX
+  H.simu.bm.pero15[i] <- H + dH
+  Y.simu.bm.pero15[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero15, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A_hat = .1',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero15, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero15, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero15, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # A_hat  = .9
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero16<- NaN*tset; T.simu.bm.pero16[1] <-T0
+X.simu.bm.pero16<- NaN*tset; X.simu.bm.pero16[1] <-X0
+H.simu.bm.pero16<- NaN*tset; H.simu.bm.pero16[1] <-H0
+Y.simu.bm.pero16<- NaN*tset; Y.simu.bm.pero16[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero16[i-1]
+  X <- X.simu.bm.pero16[i-1]
+  H <- H.simu.bm.pero16[i-1]
+  Y <- Y.simu.bm.pero16[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero16[i] <- T + dT
+  X.simu.bm.pero16[i] <- X + dX
+  H.simu.bm.pero16[i] <- H + dH
+  Y.simu.bm.pero16[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero16, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A_hat = .9',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero16, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero16, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero16, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+
+
+######### Plot change in Ahat #################
+plot(x = tset, y = Y.simu.bm.pero14, type = 'l', las = 1, lwd = 1, col = Ycol,lty = 1,
+     xlab = 'Time', ylab = 'Number of Infected Individuals',
+     main = 'Incidence of Hosts and Ticks (varying A_hat)',
+     ylim = c(0, 120), xlim = c(0, 60))
+lines(x = tset, y = Y.simu.bm.pero15, col = Ycol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero16, col = Ycol, lwd = 3, lty = 1)
+legend('topright', legend = c('Hosts (N = 50)','Ticks (N = 200)','A_hat = 0.001', 'A_hat = 0.1','A_hat = 0.9'),
+        lty = 1, lwd = c(1,1,1,2,3), cex = 0.9, col = c(Hcol, Tcol, 'black','black','black'))
+lines(x = tset, y = X.simu.bm.pero14, type = 'l', las = 1, lwd = 1, col = Xcol,lty = 1)
+lines(x = tset, y = X.simu.bm.pero15, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = X.simu.bm.pero16, col = Xcol, lwd = 3, lty = 1)
+#legend('topright', legend = c('A_hat = .001', 'A_hat = .1','A_hat = .9'),
+        #lty = 1, lwd = c(1,2,3), cex = 0.9)
+
+
+################ Changing A ################
+
+
+
+###########################################
+ # A = .01
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.01 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero17<- NaN*tset; T.simu.bm.pero17[1] <-T0
+X.simu.bm.pero17<- NaN*tset; X.simu.bm.pero17[1] <-X0
+H.simu.bm.pero17<- NaN*tset; H.simu.bm.pero17[1] <-H0
+Y.simu.bm.pero17<- NaN*tset; Y.simu.bm.pero17[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero17[i-1]
+  X <- X.simu.bm.pero17[i-1]
+  H <- H.simu.bm.pero17[i-1]
+  Y <- Y.simu.bm.pero17[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero17[i] <- T + dT
+  X.simu.bm.pero17[i] <- X + dX
+  H.simu.bm.pero17[i] <- H + dH
+  Y.simu.bm.pero17[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero17, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A = .01',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero17, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero17, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero17, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # A = .1
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.1 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero18<- NaN*tset; T.simu.bm.pero18[1] <-T0
+X.simu.bm.pero18<- NaN*tset; X.simu.bm.pero18[1] <-X0
+H.simu.bm.pero18<- NaN*tset; H.simu.bm.pero18[1] <-H0
+Y.simu.bm.pero18<- NaN*tset; Y.simu.bm.pero18[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero18[i-1]
+  X <- X.simu.bm.pero18[i-1]
+  H <- H.simu.bm.pero18[i-1]
+  Y <- Y.simu.bm.pero18[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero18[i] <- T + dT
+  X.simu.bm.pero18[i] <- X + dX
+  H.simu.bm.pero18[i] <- H + dH
+  Y.simu.bm.pero18[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero18, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A = .1',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero18, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero18, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero18, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # A  = .9
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero19<- NaN*tset; T.simu.bm.pero19[1] <-T0
+X.simu.bm.pero19<- NaN*tset; X.simu.bm.pero19[1] <-X0
+H.simu.bm.pero19<- NaN*tset; H.simu.bm.pero19[1] <-H0
+Y.simu.bm.pero19<- NaN*tset; Y.simu.bm.pero19[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero19[i-1]
+  X <- X.simu.bm.pero19[i-1]
+  H <- H.simu.bm.pero19[i-1]
+  Y <- Y.simu.bm.pero19[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero19[i] <- T + dT
+  X.simu.bm.pero19[i] <- X + dX
+  H.simu.bm.pero19[i] <- H + dH
+  Y.simu.bm.pero19[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero19, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A_hat = .9',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero19, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero19, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero19, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+
+
+######### Plot change in A #################
+plot(x = tset, y = Y.simu.bm.pero17, type = 'l', las = 1, lwd = 1, col = Ycol,lty = 1,
+     xlab = 'Time', ylab = 'Number of Infected Individuals',
+     main = 'Incidence of Hosts and Ticks (varying A)',
+     ylim = c(0, 120), xlim = c(0, 60))
+lines(x = tset, y = Y.simu.bm.pero18, col = Ycol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero19, col = Ycol, lwd = 3, lty = 1)
+legend('topright', legend = c('Hosts (N = 50)','Ticks (N = 200)','A = .001', 'A = .1','A = .9'),
+        lty = 1, lwd = c(1,1,1,2,3), cex = 0.9, col = c(Hcol, Tcol, 'black','black','black'))
+lines(x = tset, y = X.simu.bm.pero17, type = 'l', las = 1, lwd = 1, col = Xcol,lty = 1)
+lines(x = tset, y = X.simu.bm.pero18, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = X.simu.bm.pero19, col = Xcol, lwd = 3, lty = 1)
+#legend('topright', legend = c('A = .001', 'A = .1','A = .9'),
+        #lty = 1, lwd = c(1,2,3), cex = 0.9)
+
+
+
+
+################ Changing gamma ################
+
+
+
+###########################################
+ # g = .01
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.01 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero20<- NaN*tset; T.simu.bm.pero20[1] <-T0
+X.simu.bm.pero20<- NaN*tset; X.simu.bm.pero20[1] <-X0
+H.simu.bm.pero20<- NaN*tset; H.simu.bm.pero20[1] <-H0
+Y.simu.bm.pero20<- NaN*tset; Y.simu.bm.pero20[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero20[i-1]
+  X <- X.simu.bm.pero20[i-1]
+  H <- H.simu.bm.pero20[i-1]
+  Y <- Y.simu.bm.pero20[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero20[i] <- T + dT
+  X.simu.bm.pero20[i] <- X + dX
+  H.simu.bm.pero20[i] <- H + dH
+  Y.simu.bm.pero20[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero20, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A = .01',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero20, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero20, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero20, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # gamma = .1
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero21<- NaN*tset; T.simu.bm.pero21[1] <-T0
+X.simu.bm.pero21<- NaN*tset; X.simu.bm.pero21[1] <-X0
+H.simu.bm.pero21<- NaN*tset; H.simu.bm.pero21[1] <-H0
+Y.simu.bm.pero21<- NaN*tset; Y.simu.bm.pero21[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero21[i-1]
+  X <- X.simu.bm.pero21[i-1]
+  H <- H.simu.bm.pero21[i-1]
+  Y <- Y.simu.bm.pero21[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero21[i] <- T + dT
+  X.simu.bm.pero21[i] <- X + dX
+  H.simu.bm.pero21[i] <- H + dH
+  Y.simu.bm.pero21[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero21, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A = .1',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero21, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero21, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero21, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+###########################################
+ # gamma  = .9
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.9 # host recovery rate
+  v = .5 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero22<- NaN*tset; T.simu.bm.pero22[1] <-T0
+X.simu.bm.pero22<- NaN*tset; X.simu.bm.pero22[1] <-X0
+H.simu.bm.pero22<- NaN*tset; H.simu.bm.pero22[1] <-H0
+Y.simu.bm.pero22<- NaN*tset; Y.simu.bm.pero22[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero22[i-1]
+  X <- X.simu.bm.pero22[i-1]
+  H <- H.simu.bm.pero22[i-1]
+  Y <- Y.simu.bm.pero22[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero22[i] <- T + dT
+  X.simu.bm.pero22[i] <- X + dX
+  H.simu.bm.pero22[i] <- H + dH
+  Y.simu.bm.pero22[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero22, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'A_hat = .9',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero22, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero22, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero12, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+
+
+######### Plot change in gamma #################
+plot(x = tset, y = Y.simu.bm.pero20, type = 'l', las = 1, lwd = 1, col = Ycol,lty = 1,
+     xlab = 'Time', ylab = 'Number of Infected Individuals',
+     main = 'Incidence of Hosts and Ticks (varying gamma)',
+     ylim = c(0, 120), xlim = c(0, 60))
+lines(x = tset, y = Y.simu.bm.pero21, col = Ycol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero22, col = Ycol, lwd = 3, lty = 1)
+legend('topright', legend = c('Hosts (N = 50)','Ticks (N = 200)','g = .001', 'g = .1','g = .9'),
+        lty = 1, lwd = c(1,1,1,2,3), cex = 0.9, col = c(Hcol, Tcol, 'black','black','black'))
+lines(x = tset, y = X.simu.bm.pero20, type = 'l', las = 1, lwd = 1, col = Xcol,lty = 1)
+lines(x = tset, y = X.simu.bm.pero21, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = X.simu.bm.pero22, col = Xcol, lwd = 3, lty = 1)
+#legend('topright', legend = c('g = .001', 'g = .1','g = .9'),
+        #lty = 1, lwd = c(1,2,3), cex = 0.9)
+
+
+
+
+
+
+
+###################### change in birth rate ###############
+
+###########################################
+ # b_set = seq(.01, .1, 1000)
+##########################################
+#   b_set = seq(.1, .9, length.out = 10000)
+# 
+#   #b = .1 # birth rate ticks
+#   M = 20 # max number of ticks per host # OG 200
+#   d = 0.09 # natural mortality ticks # OG .01 
+#   A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+#   A = 0.5 # transmission rate from host to ticks # OG .07
+#   g = 0.9 # host recovery rate
+#   v = .5 # vertical transmisison
+# 
+#  # tick
+# #V = T + X
+# T0 = 199 # susceptible tick
+# X0 = 1 # infected tick
+# 
+# 
+# # host
+# # N = H + Y
+# H0 = 49 # susceptible host
+# Y0 = 1 # infected host
+# 
+# tset<- seq(0, 60, length.out = 10000)
+# T.simu.bm.pero23<- NaN*tset; T.simu.bm.pero23[1] <-T0
+# X.simu.bm.pero23<- NaN*tset; X.simu.bm.pero23[1] <-X0
+# H.simu.bm.pero23<- NaN*tset; H.simu.bm.pero23[1] <-H0
+# Y.simu.bm.pero23<- NaN*tset; Y.simu.bm.pero23[1] <-Y0
+# 
+# for(i in 2:length(tset)) {
+#   dt <- tset[i] - tset[i-1]
+#   T <- T.simu.bm.pero23[i-1]
+#   X <- X.simu.bm.pero23[i-1]
+#   H <- H.simu.bm.pero23[i-1]
+#   Y <- Y.simu.bm.pero23[i-1]
+#   
+#   # tick equations
+#   dT = (((b_set*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+#   dX = (((b_set*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+#   # host equations
+#   dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+#   dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+#   
+#   
+#   T.simu.bm.pero23[i] <- T + dT
+#   X.simu.bm.pero23[i] <- X + dX
+#   H.simu.bm.pero23[i] <- H + dH
+#   Y.simu.bm.pero23[i] <- Y + dY
+# }
+# 
+# N = H + Y
+# V = T + X
+
+# plot(x = tset, y = T.simu.bm.pero23, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+#      xlab = 'Time', ylab = 'Number of Infected TICKS',
+#      main = 'A_hat = .9',
+#      ylim = c(0, 200), xlim = c(0, 60))
+# lines(x = tset, y = X.simu.bm.pero23, col = Xcol, lwd = 2, lty = 1)
+# lines(x = tset, y = H.simu.bm.pero23, col = Hcol, lwd = 2, lty = 1)
+# lines(x = tset, y = Y.simu.bm.pero12, col = Ycol, lwd = 2, lty = 2)
+# legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+#         lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+# min(results[,])
+
+
+
+
+######### Plot change in gamma #################
+plot(x = b_set, y = Y.simu.bm.pero23, type = 'l', las = 1, lwd = 1, col = Ycol,lty = 2,
+     xlab = 'birth 0.1 - 0.9', ylab = 'Number of Infected Individuals',
+     main = 'Incidence of Hosts',
+     ylim = c(0, 50), xlim = c(.1, .9))
+#legend('topright', legend = c('g = .001', 'g = .1','g = .9'),
+        #lty = 1, lwd = c(1,2,3), cex = 0.9)
+
+
+
+########################### change in initial X0 #################
+###########################################
+ # v = .9, X0 = 20 T0 = 180
+##########################################
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .9 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 180 # susceptible tick
+X0 = 20 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 60, length.out = 10000)
+T.simu.bm.pero24<- NaN*tset; T.simu.bm.pero24[1] <-T0
+X.simu.bm.pero24<- NaN*tset; X.simu.bm.pero24[1] <-X0
+H.simu.bm.pero24<- NaN*tset; H.simu.bm.pero24[1] <-H0
+Y.simu.bm.pero24<- NaN*tset; Y.simu.bm.pero24[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero24[i-1]
+  X <- X.simu.bm.pero24[i-1]
+  H <- H.simu.bm.pero24[i-1]
+  Y <- Y.simu.bm.pero24[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero24[i] <- T + dT
+  X.simu.bm.pero24[i] <- X + dX
+  H.simu.bm.pero24[i] <- H + dH
+  Y.simu.bm.pero24[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero24, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected TICKS',
+     main = 'BM: PERO A = .9, N = 50',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero24, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero24, col = Hcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero24, col = Ycol, lwd = 2, lty = 2)
+legend(x = 13000, y = 1, legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(3,1,3,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+
+
+
+######### Plot change in v and X0 #################
+# plot change of infected hosts
+plot(x = tset, y = Y.simu.bm.pero24, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected Hosts',
+     main = 'Incidence of Hosts (changing v)',
+     ylim = c(0, 50), xlim = c(0, 60))
+lines(x = tset, y = Y.simu.bm.pero24, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = Y.simu.bm.pero24, col = Xcol, lwd = 2, lty = 1)
+legend('topright', legend = c('v = 001', 'v = .1','v = .9'), col = 'maroon',
+        lty = 1, lwd = 2, cex = 0.9)
+
+# Plot change of infected ticks
+plot(x = tset, y = X.simu.bm.pero24, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time', ylab = 'Number of Infected Ticks',
+     main = 'Incidence of Ticks (changing v)',
+     ylim = c(0, 120), xlim = c(0, 60))
+lines(x = tset, y = X.simu.bm.pero24, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = X.simu.bm.pero24, col = Hcol, lwd = 2, lty = 1)
+legend('topright', legend = c('v = .001', 'v = .1','v = .9'), col = 'maroon',
+        lty = 1, lwd = 2, cex = 0.9)
+
+
+
+# change in infected ticks
+X.simu.bm.pero10[length(tset)] # beginning simulation
+X.simu.bm.pero11[length(tset)] 
+X.simu.bm.pero12[length(tset)] 
+X.simu.bm.pero13[length(tset)] 
+X.simu.bm.pero14[length(tset)] 
+X.simu.bm.pero15[length(tset)] 
+X.simu.bm.pero16[length(tset)] 
+X.simu.bm.pero17[length(tset)] 
+X.simu.bm.pero18[length(tset)] 
+X.simu.bm.pero19[length(tset)] 
+X.simu.bm.pero20[length(tset)] 
+X.simu.bm.pero21[length(tset)]
+X.simu.bm.pero22[length(tset)]
+X.simu.bm.pero23[length(tset)]
+X.simu.bm.pero24[length(tset)]
+
+# change in infected hosts
+Y.simu.bm.pero10[length(tset)] # beginning simulation
+Y.simu.bm.pero11[length(tset)] 
+Y.simu.bm.pero12[length(tset)] 
+Y.simu.bm.pero13[length(tset)] 
+Y.simu.bm.pero14[length(tset)] 
+Y.simu.bm.pero15[length(tset)] 
+Y.simu.bm.pero16[length(tset)] 
+Y.simu.bm.pero17[length(tset)] 
+Y.simu.bm.pero18[length(tset)] 
+Y.simu.bm.pero19[length(tset)] 
+Y.simu.bm.pero20[length(tset)] 
+Y.simu.bm.pero21[length(tset)]
+Y.simu.bm.pero22[length(tset)]
+Y.simu.bm.pero23[length(tset)]
+Y.simu.bm.pero24[length(tset)]
+
+########### calculate change ###########
+
+#### changes in gamma
+max(X.simu.bm.pero20)
+max(X.simu.bm.pero21)
+max(X.simu.bm.pero22)
+
+max(Y.simu.bm.pero20) 
+max(Y.simu.bm.pero21)
+max(Y.simu.bm.pero22)
+
+#### changes in A
+max(X.simu.bm.pero17) 
+max(X.simu.bm.pero18)
+max(X.simu.bm.pero19)
+
+max(Y.simu.bm.pero17) 
+max(Y.simu.bm.pero18)
+max(Y.simu.bm.pero19)
+
+
+
+#### changes in A_hat 
+max(X.simu.bm.pero14) - max(X.simu.bm.pero16)
+max(X.simu.bm.pero15)
+max(X.simu.bm.pero16)
+
+max(Y.simu.bm.pero14) - max(Y.simu.bm.pero16)
+max(Y.simu.bm.pero15)
+max(Y.simu.bm.pero16)
+
+
+#### make bar plot
+
+parm <- c(0.01, 0.1, 0.9,0)
+gamma_X <- c(49.2, 43.7, 15.6,33.6)
+A_X <- c(3.1, 28, 45.1, 42.1)
+A_hat_X <- c(1, 16.3, 47,46.0)
+change_X <- c(0,33.6, 42.1, 46.0)
+sensitivityX<-data.frame(parm, gamma_X, A_X, A_hat_X)
+colnames(sensitivityX) = c('Param. values', 'Gamma', 'A', 'A_hat')
+
+
+gamma_Y <- c(79.6, 75.6, 41.1,4.0)
+A_Y <- c(1.0, 14.3,102.1,101.1)
+A_hat_Y <- c(6.7, 30.5, 11.2,81.54)
+change_Y <- c(4.0, 101.1, 81.54)
+sensitivityY<-data.frame(parm, gamma_Y, A_Y, A_hat_Y)
+colnames(sensitivityY) = c('Param. values', 'Gamma', 'A', 'A_hat')
+
+#View(sensitivityX)
+
+install.packages('kableExtra')
+library(kableExtra)
+kable(sensitivityX,booktabs = T,digits= 2, align = 'c',
+      caption = "Changes in the Number of Infected Individuals")
+
+kable(sensitivityY,booktabs = F,digits= 2, align = 'c',
+      caption = "Changes in the Number of Infected Individuals")
+
+
+kable(head(sensitivityX, 4, booktabs = TRUE) %>%
+        kable_styling(font_size = 8))
+```
+
+
+
+
+
+
+```{r 247 analysis}
+### explore  the effects of changing initial conditions
+
+# to calculate R0 has to be an entirely susceptible population N = T0
+
+SIS.model <- function(t, x, params) {
+  T = x[1]
+  X = x[2]
+  H = x[3]
+  Y = x[4]
+  
+  b = params[1] # birth rate ticks
+  M = params[2] # max number of ticks per host # OG 200
+  d = params[3] # natural mortality ticks # OG .01 
+  A_hat = params[4] # transmission rate from ticks to hosts #OG .02
+  A = params[5] # transmission rate from host to ticks # OG .07
+  g = params[6] # host recovery rate
+  v = params[7] # v
+  
+  
+   # tick equations
+  dTdt = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)
+  dXdt = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)
+  # host equations
+  dHdt =  (- (A_hat*H*X)/(H + Y) + (g*Y)) # susceptible
+  dYdt = ((A_hat*H*X)/(H + Y) - (g*Y)) # infected
+  
+  return(list(c(dTdt, dXdt, dHdt, dYdt)))
+}
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 50 # susceptible host
+Y0 = 1 # infected host
+
+initial_values = c(T = T0, X = X0,H = H0,Y = Y0)
+
+
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.9 # host recovery rate
+  v = .5 # vertical transmisison
+  
+  parameters <- c(b, M, d, A_hat, A, g, v)
+  
+  times = seq(0, 100, by = 0.01)
+  
+  results = lsoda(initial_values, times, SIS.model, parameters)
+  colnames(results) = c('time', 'T','X','H','Y')
+
+
+N = H + Y
+V = T + X
+
+plot(x = times, y = results[,'T'], type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time (Days)', ylab = 'Number of Individuals',
+     main = 'Host-Tick Population',
+     ylim = c(0, 200), xlim = c(0, 60))
+lines(x = times, y = results[,'X'], col = Xcol, lwd = 1, lty = 1)
+lines(x = times, y = results[,'H'], col = Hcol, lwd = 2, lty = 1)
+lines(x = times, y = results[,'Y'], col = Ycol, lwd = 1, lty = 2)
+legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(2,1,2,1), lwd = 2, cex = 0.9)
+
+### THINGS TO NOTE
+  # in this deterministic version of the model, there are always some susceptible hosts in population that escape infection
+  # larger initial density of susceptible hosts, the greater the fraction of hosts that become infected
+  # chain of transmission eventually breaks due to decline in infectives, not due to complete lack of susceptibles "epidemic burnout"
+
+### Ilustrate some properties of density dependent transmission
+
+
+Tend = 100
+times = seq(0,Tend, by = 1)
+
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.9 # transmission rate from ticks to hosts #OG .02
+  A = 0.9 # transmission rate from host to ticks # OG .07
+  g = 0.9 # host recovery rate
+  v = .5 # vertical transmisison
+  
+  parameters <- c(b, M, d, A_hat, A, g, v)
+
+  # tick
+  #V = T + X
+  T0 = 199 # susceptible tick
+  X0 = 1 # infected tick
+  
+  
+  # host
+  # N = H + Y
+  #H0 = 50 # susceptible host
+  Y0 = 0 # infected host
+  
+  H0_all <- seq(1, 50, .1)
+  
+  T_longterm = rep(0, length(H0_all))
+  X_longterm = rep(0, length(H0_all))
+  H_longterm = rep(0, length(H0_all))
+  Y_longterm = rep(0, length(H0_all))
+  
+for(i in 1:length(S0_all)) {
+  initial_values = c(H0_all[i], Y0, T0, X0)
+  
+  results = lsoda(initial_values, times, SIS.model, parameters)
+  
+  T_longterm[i] = results[Tend+1, 2]
+  X_longterm[i] = results[Tend+1, 3]
+  H_longterm[i] = results[Tend+1, 4]
+  Y_longterm[i] = results[Tend+1, 5]
+}
+  
+plot(H0_all, H_longterm, type = 'l',
+     xlab = 'Initial Density of Susceptible Hosts, H(0)',
+     ylab = 'Density of Susceptibles Remaining')
+lines(H0_all, H0_all, type = 'l', lty = 2, col = 'blue')
+abline(v = g/(A_hat*H), col = 'red')
+```
+
+
+
+
+
+```{r analyzing equilibrium}
+
+  b = .1 # birth rate ticks
+  M = 20 # max number of ticks per host # OG 200
+  d = 0.09 # natural mortality ticks # OG .01 
+  A_hat = 0.5 # transmission rate from ticks to hosts #OG .02
+  A = 0.5 # transmission rate from host to ticks # OG .07
+  g = 0.1 # host recovery rate
+  v = .001 # vertical transmisison
+
+ # tick
+#V = T + X
+T0 = 199 # susceptible tick
+X0 = 1 # infected tick
+
+
+# host
+# N = H + Y
+H0 = 49 # susceptible host
+Y0 = 1 # infected host
+
+tset<- seq(0, 120, length.out = 1000)
+T.simu.bm.pero25<- NaN*tset; T.simu.bm.pero25[1] <-T0
+X.simu.bm.pero25<- NaN*tset; X.simu.bm.pero25[1] <-X0
+H.simu.bm.pero25<- NaN*tset; H.simu.bm.pero25[1] <-H0
+Y.simu.bm.pero25<- NaN*tset; Y.simu.bm.pero25[1] <-Y0
+
+for(i in 2:length(tset)) {
+  dt <- tset[i] - tset[i-1]
+  T <- T.simu.bm.pero25[i-1]
+  X <- X.simu.bm.pero25[i-1]
+  H <- H.simu.bm.pero25[i-1]
+  Y <- Y.simu.bm.pero25[i-1]
+  
+  # tick equations
+  dT = (((b*((1-v)*X + T))/(M*(H+Y))) - (A*T*Y)/(H+Y) - d*T)*dt
+  dX = (((b*v*X)/(M*(H+Y))) + (A*T*Y)/(H+Y) - d*X)*dt
+  # host equations
+  dH =  (- (A_hat*H*X)/(H + Y) + (g*Y))*dt # susceptible
+  dY = ((A_hat*H*X)/(H + Y) - (g*Y))*dt # infected
+  
+  
+  T.simu.bm.pero25[i] <- T + dT
+  X.simu.bm.pero25[i] <- X + dX
+  H.simu.bm.pero25[i] <- H + dH
+  Y.simu.bm.pero25[i] <- Y + dY
+}
+
+N = H + Y
+V = T + X
+
+plot(x = tset, y = T.simu.bm.pero25, type = 'l', las = 1, lwd = 2, col = Tcol,lty = 2,
+     xlab = 'Time (Days)', ylab = 'Number of Individuals',
+     main = 'Host - Tick Population Time Series',
+     ylim = c(0, 200), xlim = c(0, 120))
+lines(x = tset, y = X.simu.bm.pero25, col = Xcol, lwd = 2, lty = 1)
+lines(x = tset, y = H.simu.bm.pero25, col = Hcol, lwd = 2, lty = 2)
+lines(x = tset, y = Y.simu.bm.pero25, col = Ycol, lwd = 2, lty = 1)
+legend('topright', legend = c('Tick, Uninfected (T)', 'Tick, Infected (X)', 'Host, Uninfected (H)', 'Host, Infected (Y)'), col = c(Tcol, Xcol, Hcol, Ycol),
+        lty = c(2,1,2,1), lwd = 2, cex = 0.9)
+min(results[,])
+
+X.simu.bm.pero25[length(tset)]
+####### What are max amount of infected? ###########
+max(X.simu.bm.pero25) # max ticks
+max(Y.simu.bm.pero25) # max hosts
+
+
+######## What proportion of the population had been sick at some point? ##########
+
+# N = H + Y --> N - H = Y
+(N - H.simu.bm.pero25[length(tset)]) / N # hosts
+(50 - T.simu.bm.pero25[length(tset)]) /50 # hosts
+
+plot(x = tset, y = Y.simu.bm.pero25/N, lwd = 2, type = 'l', col = Ycol,
+     ylab = 'Proportion of Infected Hosts', xlab = 'Time (Days)',
+     main = 'Proportion of Infected Hosts vs. Time')
+
+# V = T + X --> V - T = X
+(200 - X.simu.bm.pero25[length(tset)])/200 # ticks
+plot(x = tset, y = X.simu.bm.pero25/200, col = Xcol)
+
+## plot proportions together
+plot(x = tset, y = Y.simu.bm.pero25/N, lwd = 2, type = 'l', col = Ycol,
+     ylab = 'Proportion of Infected Groups', xlab = 'Time (Days)',
+     main = 'Host-Tick Population Time Series')
+lines(x = tset, y = X.simu.bm.pero25/200, lwd = 2, type = 'l', col = Xcol)
+legend('topright', legend = c('Infected Hosts (Y)', 'Infected Ticks (X)'),
+       col = c(Ycol, Xcol),lwd = 2)
+```
+
+
+
+
+
+
+
+
+```{r calculate R0 for all simulations}
+N = 50
+gamma = .1
+
+A_hat_set <- seq(from = 0.001, to = 0.9, length.out = 100)
+R0_set <- A_hat_set*N/gamma
+plot(x = A_hat_set, y = R0_set, type = 'l', xlab = 'Infectiousness (A_hat)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 1,
+     main = 'Host R0 for BM & BB')
+abline(v = .6, col = 'royalblue', lty = 1, lwd = 2)
+abline(v = .9, col = 'royalblue', lty = 3, lwd = 2)
+abline(v = .001, col = 'royalblue', lty = 1, lwd = 2)
+abline(v = .9, col = 'maroon', lty = 1, lwd = 2)
+abline(v = .3, col = 'maroon', lty = 1, lwd = 2)
+abline(v = .5, col = 'maroon', lty = 1, lwd = 2)
+legend('bottomright', legend = c('BM', 'BB'), col = c('maroon', 'royalblue'),
+       lwd = 2)
+
+
+A_hat = 0.5
+N_set <- seq(from = 1, to = 50, length.out = 100)
+R0_set <- A_hat*N_set/gamma
+plot(x = A_hat*N_set, y = R0_set, type = 'l', xlab = 'Host Abundance (N)', ylab = 'Basic Reproductive Number (R_0)', las = 1, lwd = 1, xlim = c(0,50))
+abline(v = 26, col = 'royalblue', lty = 1, lwd = 2)
+abline(v = 20, col = 'royalblue', lty = 3, lwd = 2)
+abline(v = 35, col = 'royalblue', lty = 1, lwd = 2)
+abline(v = 26, col = 'maroon', lty = 1, lwd = 2)
+abline(v = 20, col = 'maroon', lty = 1, lwd = 2)
+abline(v = 35, col = 'maroon', lty = 1, lwd = 2)
+legend('bottomright', legend = c('BM', 'BB'), col = c('maroon', 'royalblue'),
+       lwd = 2)
+
+
+
+
+
+
+R0.bb.pero <- .6*26/ .1
+R0.bb.nefu <- .9*20/ .1
+R0.bb.scoc <- .001*35/ .1
+
+bbprint= c(R0.bb.pero, R0.bb.nefu,R0.bb.scoc)
+
+R0.bm.pero <- .9*26/ .1
+R0.bm.nefu <- .3*20/ .1
+R0.bm.scoc <- .5*35/ .1
+
+bmprint= c(R0.bm.pero, R0.bm.nefu,R0.bm.scoc)
+
+```
+

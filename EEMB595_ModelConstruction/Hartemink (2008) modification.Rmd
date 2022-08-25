@@ -1,0 +1,186 @@
+---
+title: "Hartemink (2008) modification"
+author: "sbsambado"
+date: "4/9/2020"
+output: html_document
+---
+I am attempting to modify the next-generation matrix model from:
+'The Basic Reproduction number for complex disease systems: Defining R0 for tick-borne infections'
+By Hartemink, N., S. Randolph, S. Davis, and J. Heesterbeek
+Am. Nat V. 171 (2008)
+
+
+This approach attempts to estimate R0 with matrix elements that have a clear biological basis.
+
+This paper takes into account B. burgdorferi (Lyme disease) and Tick-borne encelphalitis (TBE), I will try to modify this model with the addition of B. miyamotoi (B. miyamotoi disese).
+
+The reason why I find this paper interesting is because it takes into consideration the different transmission routes that Lyme disease and TBE uses. B. miyamotoi may fall somewhere in between these two pathogens because my preliminary data suggests that B. miyamotoi uses systemic infections via horizontal transmission and very limited vertical transmission. Co-feeding has not been explored thoroughly in B. miyamotoi literature, but for TBE, co-feeding is a very important part of its transmission cycle. 
+I will try to replicate this study using 3 tick-borne pathogens with different transmission strategies and biological parameters to gauge their individul R0. 
+
+This paper also goes over sensitivity and elasticity analysis that I also would like to learn more about.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+I'm first going to enter all the important parameters and equations to simulate their model(1-4) before attempting my modification.
+
+1. Tick-related paramters
+```{r}
+E = 2000 # average number eggs per adult
+sl = .05 # survival probability from egg to feeding larva
+sn = .1 # survival probability from feeding larva to feeding nymph
+sa = .1 # survival probability from feeding nymph to feeding adult
+c_ll = 30 # mean number larvae cofeeding with a larva
+c_nl = 2 # mean number nymphs cofeeding with a larva
+c_al = 0.1 # mean number adult cofeeding with a larva
+c_ln = 20 # mean number larvae cofeeding with a nymph
+c_nn = 1 # mean number nymphs cofeeding with a nymph
+c_an = .01 # mean number adults cofeeding with a nymph
+c_la = .01 # mean number larvae cofeeding with an adult
+c_na = .01 # mean number nymphs cofeeding with an adult
+c_aa =.01 # mean number adults cofeeding with an adult
+
+# not sure when these parameters come into play
+n_lh = 6 # average number of larvae on competent host
+n_nh = .2 # average number of nymphs on competent host
+n_ah = .001 # average number of adults on competent host
+
+
+d_l = 2.5 # days of attachment of larva
+d_n = 3.5 # days of attachment of nymph
+d_a = 12 # days of attachment of adult
+```
+
+2. Pathogen-specific paramters
+```{r}
+# lyme disease 
+i = 120 # systemic infection duration
+theta_a = .56 # efficiency from tick to tick
+# I think theta is suppose to be broken into tick to tick so I will first assign value .56 to all situations
+theta_ll = .56 # efficiency from larva to larva
+theta_ln = .56 # efficiency from nymph to larva
+theta_la = .56 # efficiency from adult to larva
+theta_nl = .56 # efficiency from larva to nymph
+theta_nn = .56 # efficiency from nymph to nymph
+theta_na = .56 # efficiency from adult to nymph
+theta_al = .56 # efficiency from larva to adult
+theta_an = .56 # efficiency from nymph to adult
+theta_aa = .56 # efficiency from adult to adult
+
+p_l = .5 # efficiency from competent host to larva
+p_n = .5 # efficiency from competent host to nymph
+p_a = .4 # efficiency from competent host to adult
+ql = .8 # efficiency from larva to competent host
+qn = .8 # efficiency from nymph to competent host
+qa = .8 # efficiency from adult to competent host
+ra = .10 # efficiency from adult to egg
+
+
+## some other parameters that aren't explicitly mentioned in the table but throughout the text, some I am taking a guess what they are infering 
+
+hc = 0.6 # fraction of blood meals taken on competent host
+```
+
+3. Equations for type-at-births elements
+
+Types-at-births are used to categorize individuals by their state at the moment they become infected.
+
+These types-at-births differ with respect to their ability to produce secondary cases (e.g. through differences in infectivity, contacts, life history, and/or transmission routes)
+
+The principle is now to regard generations of infected individuals, distributed over the different types that have been identified.
+
+The next-generation matrix then gives the size of the next generation distributed over the different types given in the present generation.
+
+If the generations grow in size, this translates as an increase in infected numbers for all types.
+
+All elements of the matrix are reproduction numbers for pairs of types.
+
+For matrixes like the next-generation matrix, the elements of which are all nonnegative by thier biological interprettion, one has a mathematical convergence result: after sufficient generations, the distribution of infecteds over the different types becomes fixed (i.e. there are fixed ratios of numbers of infecteds over the various types), and per generation, there is one fixed growth factor with which each type in a generation grows.
+
+The growth factor is given by the largest eigenvalue of the next-generation matrix. When it is larger than 1, generation grow in size, when it ismaller than 1, generations declien in size. The biological interpretation is that the per generation growth factor in the number of infecteds. This eigenvalue therefore is R0. 
+
+Types-at-birth should not be confused with the actual life stages. They represent to the life stage at the moment of infection and is a 'characteristic' of the tick that remains the same from the moment of infection onward, irrespective of its future. 
+
+Some elements = 0 because not all types-at-birth infect all other types-at-birth. 
+- i.e. female ticks infected as adults during their third blood meal (types-at-birth 4) do not feed again after they have been infected, and so they do not produce types-at-birth 2, 3, or 4, nor can they produce types-at-birth 5 (vertebrate hosts with systemic infection)
+- k15, k55 = 0 because infected vertebrate hosts cannot possibly infect the eggs of ticks, nor can they infect other vertebrate hosts
+
+Types-at-births
+1. tick infected as an egg (via transovarial transmission)
+2. tick infected as a larva (while taking its first blood meal)
+3. tick infected as nymph (while taking its second blood meal)
+4. tick infected as adult female (while taking its third blood meal)
+5. systemically infectious vertebrate host
+
+Equations for each types-at-birth
+```{r}
+k_11 = sl*sn*sa*E*ra
+k_12 = sn*sa*E*ra
+k_13 = sa*E*ra
+k_14 = E*ra
+k_15 = 0
+k_21 = (sl*theta_ll*c_ll + sl*sn*theta_nl*c_ln + sl*sn*sa*theta_al*c_la)*hc
+k_22 = (sn*theta_nl*c_ln + sn*sa*theta_al*c_la)*hc
+k_23 = (sa*theta_al*c_la)*hc
+k_24 = 0
+k_25 = (p_l*i*n_lh)/(d_l)
+k_31 = (sl*theta_ln*c_nl + sl*sn*theta_nn*c_nn + sl*sn*sa*theta_an*c_na)*hc
+k_32 = (sn*theta_nn*c_nn + sn*sa*theta_an*c_na)*hc
+k_33 = (sa*theta_an*c_na)*hc
+k_34 = 0
+k_35 = (p_n*i*n_nh)/(d_n)
+k_41 = (sl*theta_la*c_al + sl*sn*theta_na*c_an + sl*sn*sa*theta_aa*c_aa)*hc
+k_42 = (sn*theta_na*c_an + sn*sa*theta_aa*c_aa)*hc
+k_43 = (sa*theta_aa*c_aa)*hc
+k_44 = 0
+k_45 = (p_a*i*n_ah)/(d_a)
+k_51 = (sl*ql + sl*sn*qn + sl*sn*sa*qa)*hc
+k_52 = (sn*qn + sn*sa*qa)*hc
+k_53 = sa*qa*hc
+k_54 = 0
+k_55 = 0
+  
+```
+
+4. Build a matrix
+
+For 5 types-at-birth, the next-generation matrix, K, will be a 5 x 5 matrix
+
+Each element kij represents the expected number of new cases of types-at-birth i caused by one infected individual of types-at-birth j during its entire infectious period.
+- i.e. k13 is the average number of eggs (types-at-birth 1) infected by one tick that was infected while feeding as a nymph (types-at-birth 3). So k13 is a component of transovarial transmission, but also take into account that not all ticks infected while feeding as a nymph survive to become adult ticks
+
+```{r}
+# bare bones matrix
+# x <- matrix(1:25, nrow = 5, ncol = 5)
+# x
+
+
+# matrix in words
+
+k_words <- matrix(c('transovarial','transovarial','transovarial','transovarial',0,
+                    'cofeeding', 'cofeeding', 'cofeeding', 0, 'host -> L',
+                    'cofeeding','cofeeding','cofeeding', 0, 'host -> N',
+                    'cofeeding', 'cofeeding', 'cofeeding', 0, 'host ->A',
+                    'tick -> host', 'tick -> host', 'tick -> host', 0, 0),
+                  ncol = 5, nrow = 5)
+k_words
+
+# matrix in matrix elements in paper
+K <- matrix(c(k_11,k_21,k_31,k_41,k_51,
+                k_12,k_22,k_32,k_42,k_52,
+                k_13,k_23,k_33,k_43,k_53,
+                k_14,k_24,k_34,k_44,k_54,
+                k_15,k_25,k_35,k_45,k_55), ncol = 5, nrow = 5)
+K
+
+
+```
+
+Assumptions
+- Infectiousness of individuals is independent of the transmission route via which the infection was acquired, we distinguish 5 types-at-birth
+- Types-at-birth refers specifically to the birth of the infection in the indiviudal rather than the individual
+- There is one type-at-birth for every tick life stage at which infection can be acquired
+- The fifth type-at-birth takes into account systemic infections in vertebrate hosts
+- The noncompetent host is not included as 6th type-at-birth as it cannot become infected
+- Does not distinguish between 'unfed' and 'fed' type-at-birth since nothing of interest for pathogen transmission happens until a tick hs molted into the next stage (e.g. a fed larva is the same as an unfed nymph)
+- Being infected does not influence any of the probabilities of survival, feeding, mating, or cofeeding with other ticks
