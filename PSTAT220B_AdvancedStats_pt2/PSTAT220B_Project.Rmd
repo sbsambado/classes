@@ -1,0 +1,525 @@
+---
+title: "PSTAT220B_Project"
+author: "sbsambado"
+date: "3/02/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# PSTAT 220B - Final Project
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(psych)
+library(car)
+library(MASS)
+library(boot)
+library(kableExtra)
+library(dplyr)
+library(ggpubr)
+library(jtools)
+library(broom.mixed)
+library(glmnet)
+
+### Question 1 data
+
+gloves <- read.csv("gloves.csv")
+dim(gloves) # 92  4
+
+gloves_subset <- gloves[-c(9,12,25),] 
+dim(gloves_subset) # 89 4
+
+
+gloves_subset$Period <- as.factor(gloves_subset$Period)
+gloves_subset$Observed <- as.integer(gloves_subset$Observed)
+gloves_subset$Experience <- as.integer(gloves_subset$Experience)
+gloves_subset$Gloves <- as.integer(gloves_subset$Gloves)                                     
+
+
+```
+
+## Question 1:
+
+##### Investigate whether the educational program on the importance of using gloves improve glove use in heart valve surgeries and whether it depends on the years of experience.
+
+
+### **Title**
+Habits are hard to make and break: usage of gloves in surgical settings
+
+### **Introduction**
+
+The field of microbiology has been rapidly expanding the past decade due to the improvement of diagnostic tools, better characterization of microbes and standardized sharing of data. With these advancements clinical research is becoming more commonplace to improve outcomes for both patients and health practitioners. However with this rapid advancement and career longevity of health practitioners, there are differences between individuals based on when they were first taught and amount of experience they have acquired. 
+
+This dataset looks at glove usage in a cardiology department during heart valve surgeries. It specifically looks at the impact of an educational program on compliance of glove use. This is a prospective study that observed the glove usage of 23 participants before and after the educational program. The four variables collected are: observation **period** (1 = before intervention, 2 = one month after intervention, 3 = two months after, 4 = 5 months after intervention), the number of times the nurse was **observed** during the study, the number of **gloves** the nurse used, and years of **experience** of the nurse. The number of gloves is our main response variable of interest and we explored how number of gloves depends on the other covariates experience, period, and observed (**Fig. 1** and Appendix Part A). 
+
+
+```{r fig 1, fig.cap = "Number of gloves used as a response to multiple variables"}
+
+p <-  ggplot(gloves_subset, aes(x = Period, y = Gloves)) +
+  geom_boxplot(fill = "grey89") +
+  labs(#title = "Number of gloves used by observation period",
+       y = "Gloves Used", x = "Observation Period") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+e <- ggplot(gloves_subset, aes(x = Experience, y = Gloves)) +
+  geom_smooth(method = "loess",se = FALSE, color = 'red') +
+  stat_smooth(geom="ribbon", aes(ymin = ifelse(..ymin.. < 0, 0, ..ymin..)), alpha = .3) + 
+  labs(y = "Gloves Used", x = "Experience (years)") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+fig1 <- ggarrange(p,e)
+
+fig1
+
+
+```
+
+### **Methods**
+
+Glove usage did not follow a Gaussian distribution even when point of influence were removed from the dataset (Appendix Part B) so a generalized linear model (GLM) was chosen for the analysis. The GLM has three components: random component (exponential family), systematic component (linear predictor), and link function. Because glove usage was count data that was right skewed and could take on values that were not 0 or 1, a Poisson distribution was chosen as the special case of the exponential family which assumes the following density function
+
+$$f(y;\theta, \phi) = exp(\frac{y\theta - b(\theta)}{a(\phi)} + c(y,\phi) )$$
+
+where $\theta$ is the canonical parameter and $\phi$ is the dispersion parameter. The canonical link is $\eta = ln\mu$ and the dispersion parameter should equal or be close to 1. We assume that 1) y ~ $P(\mu)$, 2) the variance is V($\mu$) = $\mu$ and 3) the constraints on the mean are $\mu$ = E(y) > 0 so the ranges of $\mu$ and $\eta$ are different.
+
+Intuitively, glove usage would be best explained by the observation **period** after education program with glove usage expected to increase right after the program and **experience** of nurse where newer nurses may have an easier time picking up and forming a habit after an education program. 
+
+Multiple version of poisson models were attempted with single and multiple covariates (Appendix Part C and Part D). Over-dispersion (dispersion parameter >> 1) was an issue for some forms of a model so a quasipoisson model was also attempted. Overdispersion was still an issue even when outliers were removed from the full dataset. A Poisson model with the offset **Observation** was also attempted. 
+
+
+### **Results**
+
+The model with all three covariates (**period**, **observed**, and **experience** ) had the lowest AIC score (171) with a dispersion ~ 1 (residual deviance 31.5 / 54 degrees of freedom). However, because the question at hand is focused on experience and observation period, which intuitively makes sense to me, I used the final model with **period** and **experience** although overdispersion was a concern since the dispersion parameter was > 1 (residual deviance 96 / 55 degrees of freedom) but because over-dispersion is quite common so I proceeded with the final model that looked at **period** and **experience** to explain the number of gloves used by a nurse. A model with both **period** and **experience** was significantly different than a model that incorporated only one covariate. (F statistic 16.49, p = 4.946e-05). Although there were a couple outliers, only three points of influence (observation 9, 12, 25) were removed due to their large influence in the cook statistic plots so the subset of the full dataset was used for the final analysis. The rest of the assumptions based on the diagnostic plots looked okay enough to proceed (**Fig 2**) despite some remaining outliers and because this is a non-linear model, I am less worried about what the qqplot looks like.
+
+```{r include = FALSE}
+## build the best fit model
+
+# no observed
+fit1.2 <- glm(Gloves ~ Period + Experience, family = poisson, data = gloves_subset)
+summary(fit1.2) # AIC = 233.7
+
+
+# just one covariate
+fit1.2b <- glm(Gloves ~ Period, family = poisson, data = gloves_subset)
+summary(fit1.2b) # AIC = 248.18
+
+fit1.2c <- glm(Gloves ~ Experience, family = poisson, data = gloves_subset)
+summary(fit1.2c) # AIC = 277.08
+
+## test model with fixe coefficient = 1
+anova(fit1.2, fit1.2b, test = "F")
+
+```
+*Diagnostic plots*
+
+```{r fig 2, fig.cap = "Diagnostic plots of best fit model", height = 4}
+
+glm.diag.plots(fit1.2) # outliers above horizontal line for cook statistic
+# outliers are pt 25, 9, 12
+
+par(mfrow = c(2,2))
+plot(residuals(fit1.2, "deviance"), xlab = "case", ylab = "Deviance Residuals")
+plot(residuals(fit1.2, "pearson"), xlab = "case", ylab = "Pearson Residuals")
+plot(residuals(fit1.2, "working"), xlab = "case", ylab = "Working Residuals")
+plot(residuals(fit1.2, "response"), xlab = "case", ylab = "Response Residuals")
+```
+
+*Coefficient plots of best fit model*
+
+```{r fig 3, fig.cap = "Coefficients of best fit model", height = 4}
+plot_summs(fit1.2,
+           scale = TRUE,
+           inner_ci_level = .8)
+```
+
+There was a difference in the number of gloves used before and after the education program where the mean numbers of gloves used were 0.2857,3.368, 3.333, and 2.083 during period 1, 2, 3, and 4, respectively (Appendix Part E). The highest compliance of wearing gloves was one month after intervention and decreased slightly each observation period, however at the last observation period the number of gloves used was still higher than before the education program (**Fig. 1**). The mean years of experience of the nurses observed was 8.2 although there were outliers who have had ~ 20 years of experience (Appendix Part A). The general trend based on just experience alone was that more experienced nurses tended to use less gloves (**Fig. 1**).
+
+Based on the Poisson model, both period of observation and experience were significant associations with the number of gloves used with period after observation being a slightly stronger predictor (estimate 1.9 - 2.3) than experience (estimate -0.06) (**Fig. 3**). Period of observation was positively associated and experience was negatively associated with number of gloves used. Period 2, the observation period right after the program, was the most significant (p = 4.653 3.26e-06) compared to other time periods (period 3 p = 4.90e-06, period 4 p = 0.000275) and experience (p = 9.79e-05).
+
+It appears that number of times a nurse was observed also influences glove counts but it is highly correlated with number of gloves (rho = 0.80) (Appendix Part B) so to eliminate collinearity from the model I did not include observed as a fixed effect or offset despite it making sense that number of times you observe someone would influence the amount of gloves you count. 
+
+### **Conclusions & Recommendations**
+
+There is a statistical association between observation period and experience of nurses with the number of gloves used. It appears that the education program did have a positive impact of higher compliance of glove usage for 1 and 2 months after the program however it declined after 5 months, probably due to natural progression of forgetting what you've learned. I would recommend the education program for increasing compliance with gloves and would suggest refresher courses every 3 months if the hospital wants to maintain better compliance with glove usage. However when taking into consideration of the age of the nurse, it appears more experienced nurses (+ 10 years - although few of them in the program) tended to have less compliance with glove usage. This may be due to being originally trained a different way or before there was an association between external microbes and negative surgical cases. There could be many other factors besides experience that could be influencing this trend such as gender, trained speciality, previous mentors, etc.  I would still recommend refresher education programs for all nurses no matter their experience level.
+
+### **References**
+
+
+## Question 2:
+
+### Specifically, investigate how the number of days of absence depends on other variables.
+
+
+### **Title**
+A story of two schools: absentee students
+
+### **Introduction**
+
+Student absence across all age levels is a real and current concern because school is a safe haven for many children. Especially at the elementary level student absence is more of a reflection of non-student decisions and other factors outside of an individual student's control due to the lack of autonomy young children have over their lives. 
+
+This dataset looks at schoold attendance of 316 randomly selected 6th graders from two elementary schools in the same district. The goal of the study is to reserach the attendance behavior (i.e. days absence) as an outcome of interest in response to other variables such as **school** (two options), **gender** (male or female), standardize **math** test score, and standardized **language** test score (**Fig 4). 
+
+```{r include = FALSE}
+school <- read.csv("school.csv")
+# dim(school) # 316   5
+# str(school)
+
+school$school <- as.factor(school$school)
+school$gender <- as.factor(school$gender)
+```
+
+
+```{r fig 4, fig.cap = "Number of absent days in response to common variables"}
+
+s <- ggplot(school, aes(x = school, y = absence)) +
+  geom_boxplot(fill= "grey89") +
+  labs(title = "Absence days across two schools",
+       y = "Absence (days)", x = "School") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+g <- ggplot(school, aes(x = gender, y = absence)) +
+  geom_boxplot(fill = "grey89")+
+  labs(title = "Absence days across gender",
+       y = "Absence (days)", x = "Gender") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+m <- ggplot(school, aes(x = math, y = absence)) +
+  geom_point() +
+  geom_smooth(method = "loess",se = FALSE, color = 'red') +
+  stat_smooth(geom="ribbon", aes(ymin = ifelse(..ymin.. < 0, 0, ..ymin..)), alpha = .3) + 
+   #facet_wrap(~school)+
+  labs(title = "Absence days across math scores",
+       y = "Absence (days)", x = "Math score") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+l <- ggplot(school, aes(x = language, y = absence)) +
+  geom_point() +
+  geom_smooth(method = "loess",se = FALSE, color = 'red') +
+  stat_smooth(geom="ribbon", aes(ymin = ifelse(..ymin.. < 0, 0, ..ymin..)), alpha = .3) + 
+ # facet_wrap(~school)+
+  labs(title = "Absence days across language scores",
+       y = "Absence (days)", x = "Language score") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+ggarrange(s,g,m,l)
+
+
+```
+
+### **Methods and Results**
+
+*Summary statistics*
+
+The mean for days absent are 8.12 and 3.45 with a standard deviation 8.5 and 5.2 for school 1 and school 2, respectively. The mean for days absent are 6.7 and 4.9 with a standard deviation 8.5 and 6.0 for female and male, respectively (Appendix Part G). The mean language scores are 43.0 and 57.3 for school 1 and school 2, respectively.
+
+
+*Negative binomial regression rational*
+
+Absent days does not follow a Gaussian distribution (**Fig. 5** and Appendix Part F) so a generalize linear model (GLM) was chosen for the analysis. However a Poisson GLM was not appropriate because of the large overdispersion that could not be corrected even when removing outliers. In this particular case, the residual deviance is 2007.4  and the degree of freedom is 311 (Appendix Part H), so the dispersion parameter is extremely over 1. A negative binomial regression was the best fit model for  nonparametric data with large overdispersion, which is a generalized Poisson model by allowing an observed heterogeneity term for each observation i. Individuals are assumed to differ randomly in a manner that is not fully accounted for by the observed covariates. Such as,
+
+$$\mathbf{E}(Y_i|x_i, \tau_i) = e^{x_i^T\beta+\epsilon_i}$$
+where the unobserved heterogeneity term $\tau_i = e^{\epsilon_i}$ is independent of the vector of covariates $x_i$. The conditional variance of the negative binomial distribution 
+$$Var(Y_i|x_i = \mu_i + \frac{\mu_i^2}{\theta})$$ 
+exceeds the conditional mean 
+$$Y_i|x_i = e^{x_i^T\beta}$$. 
+
+The negative binomial regression models the overdispersion data by allowing one more parameter than the Poisson regression, $\theta$, which will be estimated from the data. 
+
+```{r fig 5, fig.cap= "Pairs pannel plot of how variables relate to each other"}
+pairs.panels(school)
+```
+
+*Model building*
+
+Based on the distribution of days absent over school and gender seem like good candidate for predicting the number of days absent (Appendix Part F). When applying a stepwise procedure based on AIC score for backward, forward and both it appears that language is also an important predictor for days absent (Appendix Part I). The variable math is borderline important but based on the rules of parsimony, the variable math will be omitted from future analysis. Also when comparing the full model (covariates = school + gender + language + math) to nested model (covariates = school + gender + language), the nested model had a lower AIC score (1744 compared to 1745.8) (Appendix Part J). The form of the model equation for negative binomial regression is the log of the expected outcome that is predicted with a linear combination of the predictors:
+
+$$ln(absent) = \beta_0 + \beta_1I(school_i = 2) + \beta_2I(gender_i = 2) + \beta_3language_i$$
+*Analyzing the best fit model*
+
+School, gender and language are significantly associated with days absent. School 1 is most statistically significant predictor of absent days (p < 2e-16) followed by school 2 ( p = 1.33e-07), gender Male (p = 0.00283), and language (p = 0.03440). School 1 has a coefficient of 2.64 which means that for each one-unit increase in school 1, the expected log count of the number of days absent increases by 2.64. In this model output, the variable gender Male is the expected difference in log count between females and males with the expected log count for gender Male is 0.40 lower than the expected log count for gender female. The indicator variable language has a coefficient of - 0.01 which means that for each one-unit increase in language, the expected log count of the number of days absent decreases by 0.01. The estimated value for the overdispersion parameter, $\theta$ is 0.87 with a standard error of 0.0862 and the 2x log-likelihood of the model is -1733.9820 (Appendix Part K.1) .
+
+```{r include = FALSE}
+## let's do glm.nb
+fit2.nb <- glm.nb(absence ~  school + gender + language, data = school)
+summary(fit2.nb) # AIC: 1744
+
+```
+
+To determine if school itself is statistically signifiant, we compared a model with and without school as well as gender. The chi-square test indicates that school is a statistically significant predictor of days absent (p = 1.767145e-07) as well as gender (0.003368272) but less significant (Appendix Part K). 
+
+The exponated estimates and 95% confidence intervals are as follows: school 1 (estimate = 14.0, 95 CI%: 9.2 - 21.7), school 2 (estimate = 0.5, 95 CI% 0.4 - .6), gender male (estimate = 0.7, 95% CI 0.5 - 0.8), language (estimate = 1.0, 95% CI: 0.99 - 0.98). The incident rate for School 1 is 13 times the incident rate for School 2. 
+
+```{r warning = FALSE, message = FALSE}
+
+est <- cbind(Estimate = coef(fit2.nb), confint(fit2.nb))
+exp(est)
+```
+
+*Diagnostic plots*
+
+Although there are a couple points that could have potential influence and leverage on the outcome of our models, they do not seem to be too much of a concern especially since outcomes don't change when a few outliers are removed. And because this is a generalized form of a model I am not worried about the normality assumption with the qqplot.
+
+```{r}
+
+# fig  6, fig.cap= "Diagnostic plots"
+glm.diag.plots(fit2.nb) # outliers above horizontal line for cook statistic
+# outliers are pt 25, 9, 12
+
+par(mfrow = c(2,2))
+plot(residuals(fit2.nb, "deviance"), xlab = "case", ylab = "Deviance Residuals")
+plot(residuals(fit2.nb, "pearson"), xlab = "case", ylab = "Pearson Residuals")
+plot(residuals(fit2.nb, "working"), xlab = "case", ylab = "Working Residuals")
+plot(residuals(fit2.nb, "response"), xlab = "case", ylab = "Response Residuals")
+```
+
+*Predicted values*
+
+To look at predicted counts of absent days for various levels of our predictors of interest like school and gender, we created a new dataset with values of school and gender and then used the predict function to calculate the predicted days absent. We see that the predicted number of events for school 1 is about 9.1 holding language at its mean. The predicted number events for school 2 is lower at 2.8.
+
+```{r include = FALSE}
+
+
+newdata <- data.frame(language = mean(school$language), school = factor(1:2, levels = 1:2,
+    labels = levels(school$school)), gender = factor(1:2, levels = 1:2,
+    labels = levels(school$gender)))
+
+newdata$phat <- predict(fit2.nb, newdata, type = "response")
+
+
+newdata # We see that the predicted number of events for school 1 is about 9.1 holding language at its mean. The predicted number events for school 2 is lower at 2.8.
+
+
+newdata2 <- data.frame(
+  language = rep(seq(from = min(school$language), to = max(school$language), length.out = 100), 2), 
+  school = factor(rep(1:2, each = 100), levels = 1:2, labels = levels(school$school)),
+  gender = factor(rep(1:2, each = 100), levels = 1:2, labels = levels(school$gender))
+  )
+
+
+newdata2 <- cbind(newdata2, predict(fit2.nb, newdata2, type = "link", se.fit=TRUE)) 
+
+newdata2 <- within(newdata2, {
+DaysAbsent <- exp(fit)
+LL <- exp(fit - 1.96 * se.fit)
+UL <- exp(fit + 1.96 * se.fit)
+})
+
+```
+
+The graph shows that the expected count across the range of language score for each type of school along with 95% confidence intervals. The lines aren't straight because this is a log linear model and what is plotted are the expected values not the log of expected values. However school 1 is predicted to have more days absent than school 2 no matter what the language score is, insinuating that school matters more than language score.
+
+```{r fig 7, fig.cap= "Predicted days absent"}
+
+ggplot(newdata2, aes(language, DaysAbsent)) +
+geom_ribbon(aes(ymin = LL, ymax = UL, fill = school), alpha = .25) + 
+  geom_line(aes(colour = school), size = 2) +
+  theme_bw() +
+  labs(y = "Days Absent", x = "Language Score")
+
+```
+
+### **Conclusions & Recommendations**
+
+There is a statistical association between days absent and school as well as gender (but less so). School 1 tended to have more absent days and lower language skills than school 2. This may be a reflection of socio-economic factors such as gdp, quality of education, access to teachers or resources which are all out of an individual student's hand. I recommend that this study be followed up with those additional factors since social determinants are known to negatively impact a child's eduation. Other methods to associate this multifactorial dataset could include polynomial or spline models which could fit the data better but may be less interpretable unless someone with a strong education background could provide context to the nuances that go into a "quality" education.
+
+
+### **Appendix**
+
+
+#### Appendix for question 1
+
+**Part A.** EDA
+
+```{r}
+ggplot(gloves_subset, aes(x = Observed))+
+  geom_histogram()  +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+
+ggplot(gloves_subset, aes(x = Experience, y = Gloves)) +
+  geom_point() +
+  labs(title = "Number of gLoves used by years of experience",
+       y = "Gloves Used", x = "Experience (years)") +
+  theme_bw() +
+  theme(axis.title.x = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold"))
+```
+
+**Part B.** Distribution of glove usages
+
+```{r}
+pairs.panels(gloves_subset)
+
+hist(gloves$Gloves, xlab = "Gloves Used", main = "Histogram of Glove Usage")
+hist(gloves_subset$Gloves, xlab = "Gloves Used", main = "Histogram of Glove Usage")
+```
+
+**Part C.** Variable selection
+
+```{r}
+fita <- glm(Gloves ~ Period , family = poisson, data = gloves)
+fitb <- glm(Gloves ~ Period + Observed , family = poisson, data = gloves)
+fitc <- glm(Gloves ~ Period + Observed + Experience, family = poisson, data = gloves)
+
+summary(fita) # AIC = 324
+summary(fitb) # AIC = 222
+summary(fitc) # AIC = 218
+```
+
+
+**Part D.** Other model attempts
+```{r}
+# with observed
+fit1.10 <- glm(Gloves ~ Period + Experience + Observed, family = poisson, data = gloves_subset)
+summary(fit1.10) #AIC 171... dispersion 31/54 no overdispersion
+
+# one with offset
+fit1.7 <- glm(Gloves ~ Period + Experience + offset(Observed), family = poisson, data = gloves_subset)
+summary(fit1.7) # AIC = 779.33
+
+## lets use quasi-poisson, estimates are the same but SE and p-values are different. t-distribution is used
+fit1.3 <- update(fit1.2, family = quasipoisson)
+
+```
+
+**Part E.** Mean number of gloves
+```{r}
+
+
+gloves_subset1 <- gloves_subset[gloves_subset$Period == "1",] 
+summary(gloves_subset1)
+
+gloves_subset2 <- gloves_subset[gloves_subset$Period == "2",] 
+summary(gloves_subset2)
+
+gloves_subset3 <- gloves_subset[gloves_subset$Period == "3",] 
+summary(gloves_subset3)
+
+gloves_subset4 <- gloves_subset[gloves_subset$Period == "4",] 
+summary(gloves_subset4)
+
+```
+
+
+#### Appendix for question 2
+
+
+**Part F. Distribution of absent days by school and gender**
+```{r}
+ggplot(school, aes(absence, fill = school)) + 
+  geom_histogram(binwidth = 1) +
+  facet_grid(school ~ ., margins = TRUE, scales = "free")
+
+ggplot(school, aes(absence, fill = gender)) + 
+  geom_histogram(binwidth = 1) +
+  facet_grid(gender ~ ., margins = TRUE, scales = "free")
+```
+
+**Part G. Summary statistics**
+```{r}
+with(school, tapply(absence, school, function(x) {
+  paste("Mean is: ", mean(x), ", SD is: ", sd(x))
+}))
+
+with(school, tapply(absence, gender, function(x) {
+  paste("Mean is: ", mean(x), ", SD is: ", sd(x))
+}))
+
+mean(school$language[school$school == 1])
+mean(school$language[school$school == 2])
+```
+
+**Part H. Trying to fit a poisson model but shows large over dispersion**
+```{r}
+fit2.1 <- glm(absence ~ school, family = poisson, data = school)
+fit2.2 <- glm(absence ~ gender, family = poisson, data = school)
+fit2.3 <- glm(absence ~ math, family = poisson, data = school)
+fit2.4 <- glm(absence ~ language, family = poisson, data = school)
+
+summary(fit2.1)
+summary(fit2.2)
+summary(fit2.3)
+summary(fit2.4)
+
+plot_summs(fit2.1, fit2.2, fit2.3, fit2.4)
+
+
+fit2.full <- glm(absence ~ school + gender + math + language, family = poisson, data = school)
+fit.step <- stepAIC(fit2.full, direction = "backward")
+fit.step <- stepAIC(fit2.full, direction = "forward")
+fit.step <- stepAIC(fit2.full, direction = "both")
+
+summary(fit2.full) # overdispersion is HUGE (2007.4/ 311 )
+
+
+fit2.modified <- glm(absence ~ school + gender + language, family = poisson, data = school)
+summary(fit2.modified) # overdispersion is still HUGE (2007.6/ 312 )
+
+```
+
+
+**Part I. Full negative binomial model**
+
+```{r}
+fit2.nbfull <- glm.nb(absence ~ school + gender + math + language, data = school)
+fit.step <- stepAIC(fit2.nbfull, direction = "backward")
+fit.step <- stepAIC(fit2.nbfull, direction = "forward")
+fit.step <- stepAIC(fit2.nbfull, direction = "both")
+```
+
+
+**Part J. Comparing nested to full negative binomial model**
+```{r}
+## let's do glm.nb
+fit2.nb <- glm.nb(absence ~  school + gender + language, data = school)
+summary(fit2.nb) # AIC: 1744
+
+
+fit2.nbb <- glm.nb(absence ~  school + gender + language + math, data = school)
+summary(fit2.nbb) # AIC: 1745.8
+
+anova(fit2.nb, fit2.nbb)
+```
+
+**Part K.1 fitting best glm.nb**
+
+```{r}
+## let's do glm.nb
+fit2.nb <- glm.nb(absence ~  school + gender + language, data = school)
+summary(fit2.nb) # AIC: 1744
+
+```
+
+
+**Part K. To determine if school or gender are statistically significant on itself.**
+
+```{r}
+fit2.nb2 <- update(fit2.nb, .~ . - school)
+anova(fit2.nb, fit2.nb2)
+
+
+fit2.nb2 <- update(fit2.nb, .~ . - gender)
+anova(fit2.nb, fit2.nb2)
+
+
+```
+
+

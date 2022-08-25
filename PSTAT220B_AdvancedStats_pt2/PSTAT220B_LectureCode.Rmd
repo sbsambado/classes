@@ -1,0 +1,1267 @@
+---
+title: "PSTAT220B_LectureCode"
+author: "sbsambado"
+date: "5/10/2022"
+output: html_document
+---
+
+# PSTAT 220B Winter quarter 2022
+## Taught by Professor Wang
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### GLM notes
+
+#### Analysis of birth weight data
+The low birth weight in infants data contains 189 births at a US hospital with the following variables:
+
+*low*: 1 if birth weight less than 2.5kg, 0 otherwise 
+*age*: age of mother in years
+*lwt*: weight of mother (lbs) at last menstrual period 
+*race*: white/black/other
+*smoke*: 1 if smoked during pregnancy, 0 otherwise 
+*ptl*: number of previous premature labours
+*ht*: 1if mother had histroy of hypertension, 0 otherwise
+*ui*: 1 if mother had uterine irritability, 0 otherwise 
+*ftv*: number of physician visits in the first trimester
+*bwt*: actural birth weight (grams)
+
+```{r}
+
+###### 1. Load and preliminary look at the data
+library(MASS)
+
+attach(birthwt)
+
+#pdf(file = "birthwt1.pdf", height = 4, width = 4.5)
+par(mfrow = c(3,3), mgp = c(2,1,0), mar = c(3,3,3,1)+ .1)
+for(i in 1:9) hist(birthwt[,i], col = "grey",
+                   xlab = dimnames(birthwt)[[2]][i],
+                                            main = paste("Histogram of", dimnames(birthwt)[[2]][i]))
+
+# create categorical variables
+
+race <- factor(race, label = c("white", "black", "other"))
+table(ptl)
+
+ptd <- factor(ptl  0)
+table(ftv)
+
+bwt <- data.frame(low, age, lwt, race, smoke = (smoke  0),
+                  ptd, ht = (ht0), ui - (ui0), ftv)
+
+detach("birthwt")
+rm(race, ptd, ftv)
+attach(bwt)
+
+###### 2. Prelimilary look at the possible effects of individual covariate
+
+for(i in 2:3) boxplot(split(bwt[,i], bwt[,1]),
+                      ylab= dimnames(bwt)[[2]][i],
+                      names = c("not low", "low"))
+
+
+
+## A R function computing proportions for segments
+
+segavg <- function (z, y, k) {
+  y <- y[order(z)]
+  z <- sort(z)
+  prop <- rep(-999, k)
+  q <- seq(k+1)
+  d <- as.integer(length(z)/k)
+  
+  for (i in 1:(k-1)) {
+    q[i] <- z[(1 + (i-1)*d)]
+    prop[i] <- mean(y[(1 + (i-1)*d): (i*d)])
+  }
+  q[k] <- z[1+ (k-1)*d]
+  q[k+1] <- max(z)
+  prop[k] <- mean(y[(1+ (k-1)*d): length(y)])
+return(q, prop)
+}
+
+# plot proportions
+# par(mfrow=c(2,2), mgp=c(2,1,0), mar=c(3,3,2,1)+.1)
+# for (i in 2:3) {
+#   a <- segavg(bwt[,i], bwt[,1], 10)
+#   plot(bwt[,i], bwt[,1], xlab = dimnames(bwt)[[2]][i],
+#        ylab = "low proportion")
+#   for (j in 1:10) segments(a$q[j], a$prop[j],
+#                            a$q[j+1], a$prop[j], lwd = 4)
+# }
+# 
+# # plot proportions on logit scale
+# 
+# for (i in 2:3) {
+#   a <- segavg(bwt[,i], bwt[,1], 10)
+#   plot(bwt[,i], bwt[,1]*(max(log(a$prop/(1- a$prop))) + 1) +
+#     (1 - bwt[,1]*min(log(a$prop/(1-a$prop))) - 1),
+#   ylim = range(log(a$prop/(1-a$prop))) + c(-1,1),
+#   pch = " | ", xlab = dimnames(bwt)[[2]][i],
+#   ylab = "logit of low proportion")
+# for (i in 1:10) segments(a$q[i],
+#                          log(a$prop[i]/ (1 - a$prop[i])),
+#                          a$q[i+1], log(a$prop[i]/ (1 - a$prop[i])),
+#                          lwd = 4)
+# }
+
+## Marginal tables
+
+for (i in 4:9) print(table(bwt[,1], bwt[,i]))
+
+###### Build models
+
+## (a) fit a linear model with all covariates
+
+fit1 <- glm(low ~ ., family = binomial, data = bwt)
+summary(fit1)
+
+# stepwise procedure
+
+fit.step <- stepAIC(fit1, direction = "backward")
+summary(fit.step)
+
+# exhaustive search
+library(bestglm)
+
+# make y to be the last column
+bwt.for.best <- bwt[, c(2:9, 1)]
+fit.best <- bestglm(Xy = bwt.for.best, family = binomial, IC = "AIC",
+                    method = "exhaustive")
+
+# show top 5 models
+fit.best$BestModels
+
+# show results from best model
+summary(fit.best$BestModel)
+
+# 10 fold cross-validation
+library(boot)
+
+cv.glm(bwt, fit1, K = 10)$delta # The first component is the raw cross-validation estimate of prediction error. The second component is the adjusted cross-validation estimate. The adjustment is designed to compensate for the bias introduced by not using leave-one-out cross-validation.
+
+cv.glm(bwt, fit.step, K = 10)$delta
+
+# LASSO
+library(glmnet)
+X <- model.matrix(fit1)[,-1]
+fit.lasso <- glmnet(X, low, family = "binomial",
+                    lambda.min = 0, nlambda = 101, alpha = 1)
+
+plot(fit.lasso, xvar = "lambda", xlim = c(-9, -2))
+text(-8, coef(fit.lasso)[-1, length(fit.lasso$lambda)],
+     labels = colnames(X), cex = 0.6)
+
+fit.lasso.cv <- cv.glmnet(X, low, family = "binomial",
+                          lambda.min = 0, nlambda = 101)
+abline(v = log(fit.lasso.cv$lambda.min), col = "red")
+mtext("CV estimate", side = 1, at = log(fit.lasso.cv$lambda.min), cex = .6)
+plot(fit.lasso.cv)
+
+
+head(X)
+
+# raceblack and raceother are dummy variables for the race factor
+# ftv1 and ftv2+ are dummy variables for the ftv factor
+# we want to select race and ftv as factors
+
+library(gglasso)
+
+# input y needs to be -1 or 1
+
+low1 <- low 
+low1[low1==0] <- -1
+
+fit.glasso <- gglasso(X, low1, group = c(1,2,3, 4:7, 8, 8), loss = "logit", nlambda = 101)
+plot(fit.glasso, xlim = c(-8, 0))
+text(-7, coef(fit.glasso)[-1, length(fit.glasso$lambda)], labels = colnames(X), cex = .6)
+fit.glass.cv <- cv.gglasso(X, low1, group = c(1,2,3,4:7, 8, 8), loss = "logit")
+abline(v = log(fit.glass.cv$lambda.min), col = "red")
+mtext("CV estimtae", side = 1, at = log(fit.glass.cv$lambda.min), cex = .6)
+plot(fit.glass.cv)
+
+
+coef.lasso <- predict(fit.lasso, type = "coefficients", 
+                      s = fit.lasso.cv$lambda.min)
+coef.glasso <- coef(fit.glass.cv, s = fit.glass.cv$lambda.min)
+print(cbind(coef(fit1), as.vector(coef.lasso),
+            as.vector(coef.glasso)), digit = 4)
+
+## (b) investigate possible interactions
+
+fit2 <- stepAIC(fit1, ~.^2, trace = F)
+summary(fit2)
+
+## (c) Investigate higher order effects of age
+
+fit3 <- update(fit2, ~. +I(age^2) + I(age^3) + I(age^4))
+fit3.step <- stepAIC(fit3)
+
+# Analysis of deviance tables, sequentially (type I)
+# In Type I, we choose the most ‘important’ independent variable and it will receive the maximum amount of variation possible.
+# Chi-Square test in R is a statistical method which used to determine if two categorical variables have a significant correlation between them. 
+anova(fit3.step, test = "Chi")
+
+# Analysis of deviance tables, non-sequentially (type III)
+# If there is an interaction effect and we are looking for an “equal” split between the independent variables, Type III should be used.
+library(car)
+
+Anova(fit3.step, test.statistic = "LR", type = "III") #  LR = likelihood ratio test compares the goodness of fit of two nested regression models.
+
+fit4 <- update(fit3.step, ~ . - I(age^3))
+Anova(fit4, test.statistic = "LR", type = "III")
+
+# comapre nested models
+
+fit5 <- update(fit4, ~ . - I(age^2))
+anova(fit3.step, fit4, fit5, test = "Chi")
+
+# check if any term can be droped
+
+drop1(fit5, test = "Chi")
+
+summary(fit5)
+
+## (d) Develop an additive model, for the purpose of illustration
+
+drop1(fit1, test = "Chi")
+
+fit6 <- update(fit1, ~.-ftv)
+drop1(fit6, test = "Chi")
+
+fit7 <- update(fit6, ~ . -age)
+drop1(fit7, test = "Chi")
+
+fit8 <- update(fit7, ~. - ui)
+drop1(fit8, test = "Chi")
+
+#Compare non-nested models using AIC
+anova(fit5, fit8, test = "Cp") # Mallows' C_p statistic is the residual sum of squares plus twice the estimate of \sigma^2 sigma 2 times the residual degrees of freedom.
+
+
+
+
+
+
+###### 4. Diagnostics
+
+library(boot)
+#pdf(file="birth31.pdf",height=4,width=4.5)
+#par(mfrow=c(2,2), mgp=c(2,1,0), mar=c(3,3,2,1)+.1)
+glm.diag.plots(fit5)
+
+# fit without two influential points
+
+fit9 <- update(fit5, subset = -c(132, 185))
+summary(fit9)
+
+
+# more diagnostic plots and joint effect of age and ftv
+# partial residuals
+ parresi <- residuals(fit5,type="partial")
+ plot(age,parresi[,2],ylab="partial residuals")
+ lines(smooth.spline(age,parresi[,2]))
+ 
+ plot(lwt,parresi[,3],ylab="partial residuals")
+ lines(smooth.spline(lwt,parresi[,3],spar=0.0001))
+ 
+
+# # joint effect of age and ftv
+ 
+ boxplot(split(age,ftv),xlab="ftv",ylab="age")
+ 
+ plot(age, coef(fit5)[2]*age, type="n",
+    ylab="age effect", ylim=c(-8,5))
+ abline(0,coef(fit5)[2], col=1)
+ abline(coef(fit5)[8],coef(fit5)[10]+coef(fit5)[2],col=2)
+ #abline(coef(fit5)[9],coef(fit5)[11]+coef(fit5)[2],col=3)
+ legend(15,-4, lty=rep(1,3), col=1:3, legend=c("ftv=0","ftv=1","ftv=2+"), cex=.5)
+ 
+ 
+ ## prediction error
+ 
+ # Receiver operating characteristic curve (ROC): a graph showing the performance of a classification model at all classification thresholds
+ # AUC: area under the ROC curve. The higher the AUC, the better the performance of a model at distinguishing between the positive and negative classes
+ 
+ table(low, predict(fit5)  0 ) # confusion matrix
+ 
+ library(pROC)
+ 
+ p <- predict(fit5, type = "resp")
+ (r <- roc(low, p))
+ 
+ (r1 <- roc(low, p1 <- predict(fit3.step, type = "resp")))
+ 
+plot(r, asp = F, col = 1)
+plot(r1, add = T, col = 2) 
+legend(.2, .3, lty  = rep(1,2), col = 1:2, legend = c("fit5", "fit3.step"), cex = .5)
+
+
+
+
+
+
+
+
+
+
+
+
+###### 6. Estimates and confidence intervals for parameters
+
+se <- sqrt(diag(summary(fit5)$cov.unscaled))
+ci1 <- cbind(fit5$coef, fit5$coef-1.96*se, fit5$coef+1.96*se)
+round(ci1, 4)
+
+# Confidence intervals based on profile likelihoods
+
+ci2 <- cbind(fit5$coef, confint(fit5))
+round(ci2, 4)
+
+
+# Confidence intervals on the odds scale
+round(exp(ci2), 4)
+
+
+
+
+
+
+
+
+
+###### 7. Probit link
+
+fit10 <- update(fit5, family = binomial(link = probit))
+summary(fit10)
+
+# comapre two links
+
+anova(fit5, fit10, test = "Chi")
+
+```
+
+
+#### Analysis of budworm data
+
+In a toxicity experiment, batches of twenty moths of each sex were exposed for 3 days to the pyrethroid at different doses.
+
+
+Goal: investigate how toxicity depends on dosage.
+
+```{r}
+
+# input data
+
+# log2 transformation of the actural dose
+
+ldose <- rep(0:5,2)
+
+numdead <- c(1,4,9,13,18,20,0,2,6,10,12,16)
+
+sex <- factor(rep(c("M","F"), c(6,6)))
+
+## There are 2 ways to specify the GLM model for Binomial data.
+### 1. Use ratio as response and weights to input the number of trials
+### 2. Input data as a two-column matrix: 1st column for the numbers of successes and 2nd column for the numbers of failures
+
+# option 1
+
+fit1.1 <- glm(numdead/20 ~ sex*ldose, family = binomial,
+              weights = rep(20,12))
+summary(fit1.1, cor = F)
+
+
+# Option 2
+
+SF <- cbind(numdead, numalive = 20 - numdead)
+fit1.2 <- glm(SF ~ sex*ldose, family = binomial)
+summary(fit1.2, cor = F)
+
+
+ plot(c(1,32), c(0,1), type="n", xlab="dose", ylab="prob", log="x")
+ text(2^ldose, numdead/20, labels=as.character(sex))
+ ld <- seq(0,5,.1)
+ lines(2^ld, predict(fit1.2, data.frame(ldose=ld,
+      sex=factor(rep("M",length(ld)), levels=levels(sex))),
+      type="response"), col=3)
+ lines(2^ld, predict(fit1.2, data.frame(ldose=ld,
+      sex=factor(rep("F",length(ld)), levels=levels(sex))),
+      type="response"), col=2)
+ 
+ 
+ logit <- function(x) log(x/(1-x))
+ numdead1 <- c(1,4,9,13,18,19.5,0.5,2,6,10,12,16)
+ plot(c(1,32), c(0,1), type="n", xlab="dose", ylab="logit", log="x",
+     ylim=range(logit(numdead1/20)))
+ text(2^ldose, logit(numdead1/20), labels=as.character(sex))
+ ld <- seq(0,5,.1)
+ lines(2^ld, predict(fit1.2, data.frame(ldose=ld,
+      sex=factor(rep("M",length(ld)), levels=levels(sex))),
+      type="link"), col=3)
+ lines(2^ld, predict(fit1.2, data.frame(ldose=ld,
+      sex=factor(rep("F",length(ld)), levels=levels(sex))),
+      type="link"), col=2) 
+ 
+ 
+ # Interaction not significant. Use "-1" in formula to reparametrize the model which gives separate intercepts for each sex.
+ 
+ fit2 <- glm(SF ~ sex+ldose-1, family = binomial)
+ summary(fit2, cor = F)
+ 
+ fit3 <- glm(SF ~ ldose, family = binomial)
+ summary(fit3, cor = F)
+ 
+ 
+# Compare 3 models. fit2 is the best.
+ 
+ anova(fit1.2, fit2, fit3, test = "Chisq")
+ 
+ 
+ 
+ 
+ 
+ ### Diagnostic plots
+ 
+ library(boot)
+ library(faraway)
+ glm.diag.plots(fit2)
+ 
+ par(mfrow=c(2,2), mgp=c(2,1,0), mar=c(3,3,2,1)+.1)
+  plot(residuals(fit2)~predict(fit2,type="link"),
+     xlab="Linear predictor", ylab="Deviance residuals")
+  
+#half-normal plot of Studentized residuals
+ halfnorm(rstudent(fit2))
+ h <- influence(fit2)$hat
+ plot(h/(1-h),cooks.distance(fit2),ylab="Cook statistic")
+ plot(cooks.distance(fit2),
+       xlab="Case",ylab="Cook statistic")
+ 
+ 
+ # In toxicity studies, often one wants to estimate the dose at which the probability of response is p. In particular, the dose corresponds to p = .5 is called “50% leathal dose, or LD50. We now compute this quantity for log-dose, which could be transformed back to the original scale. Let ξp be the log-dose for which the probability of response is p.
+ 
+# compute LD50: 50% lethal dose, i.e. log-dose such that p=.5
+ 
+ library(MASS)
+ 
+ # cf: terms in the coefficient vector giving the
+# intercept and coefficients for dose.
+ 
+ 
+# For female
+ dose.p(fit2, cf=c(1,3), p=.5)
+ 
+# For male
+dose.p(fit2, cf=c(2,3), p=.5)
+ 
+```
+
+
+#### Analysis of ship data
+
+The ship data in the handout contains the number of damage incidents (coded as incidents) caused by waves to the forward section of certain cargo-carrying vessels. The investigator wanted to know the risk of damage associated with three covariates:
+
+*Ship type*: coded as type
+*Year of construction*: coded as construction 
+*Period of operation*: coded as operation 
+*Aggregate months service*: coded as service
+
+```{r}
+############## 1. input data
+
+attach(ships)
+str(ships)
+
+x <- ships
+names(x) <- c("type","construction","operation","service","incidents")
+
+#  NA values represent impossible cases rather than missing values
+
+ x <- x[!is.na(x[,5]),]
+ type <- as.factor(x[,1])
+ construction <- as.factor(x[,2])
+ operation <- as.factor(x[,3])
+ service <- log(x[,4])
+ incidents <- x[,5]
+ 
+ ############## 2. Preliminary look at the data
+ par(mfrow=c(2,2), mgp=c(2,1,0), mar=c(3,3,2,1)+.1)
+ boxplot(split(incidents,type),ylab="incidents")
+ boxplot(split(incidents,construction),ylab="incidents")
+ boxplot(split(incidents,operation),ylab="incidents")
+ plot(service,log(incidents+0.5),xlab="log(service)",
+       ylab="log(incidents)")
+ 
+ 
+ ############## 3. Build models
+ 
+ fit1 <- glm(incidents ~ type + construction + operation + service, family = poisson, data = x)
+ summary(fit1)
+ 
+ 
+ library(car)
+ 
+ Anova(fit1, test.statistic = "LR", type = "III")
+ 
+ # There are some signs of over-dispersion. We will use quasi-Poisson. Note that the estimates are the same, but SE and p-values are different. t-distribution is used.
+ 
+ fit1.1 <- update(fit1, family = quasipoisson)
+ summary(fit1.1)
+ 
+# Use F distribution for testing.
+Anova(fit1.1,test.statistic="F",type="III") 
+ 
+
+#default is pearson method, the following uses deviance
+Anova(fit1.1,test.statistic="F",type="III",
+        error.estimate="deviance")
+
+
+# investigate interaction
+
+fit2 <- update(fit1, ~ .+type:construction)
+Anova(fit2,test.statistic="LR",type="III")
+
+
+## Investigate interaction using quasi-likelihood
+fit2.1 <- update(fit2, family=quasipoisson)
+Anova(fit2.1,test.statistic="F",type="III")
+
+# Compare two nested models using F test
+
+anova(fit1.1,fit2.1,test="F")
+
+ ############## 4. Diagnostic plots
+
+library(boot)
+
+glm.diag.plots(fit1)
+
+par(mfrow=c(2,2), mgp=c(2,1,0), mar=c(3,3,2,1)+.1)
+ plot(residuals(fit1,"deviance"),xlab="case",
+       ylab="Deviance Residuals")
+ plot(residuals(fit1,"pearson"),xlab="case",
+       ylab="Pearson Residuals")
+ plot(residuals(fit1,"working"),xlab="case",
+       ylab="Working Reiduals")
+ plot(residuals(fit1,"response"),xlab="case",
+       ylab="Response Residuals")
+ 
+ # fit without observation 19
+ 
+fit3 <- glm( incidents[-19] ~ type[-19]+construction[-19]+
+             operation[-19]+service[-19], family=poisson, data = x) 
+summary(fit3)
+
+
+# Analysis of deviance using Chi-square distribution
+
+Anova(fit3,test.statistic="LR",type="III")
+
+# same as fitting a quasi-Poisson first
+Anova(fit3,test.statistic="F",type="III")
+
+# closer look at type
+boxplot(service~type,xlab="type",ylab="service")
+table(type,construction)
+table(type,operation)
+
+
+ ##############  5. Offset option. MN fixed coefficient of service as 1. It can be fitted using the offset option. The estimates are the same as Table 6.3 on p. 208, but SE’s are different.
+
+fit4 <- glm(incidents ~type + construction + operation +
+               offset(service), family=poisson, data = x)
+
+summary(fit4)
+
+
+fit4.1 <- glm( incidents ~ type+construction+operation+
+                 offset(service), family=quasipoisson, data = x)
+summary(fit4.1)
+
+# Test the model with fixed coefficient=1.
+
+anova(fit1.1,fit4.1,test="F")
+```
+
+
+#### Logistic model with retrospective sampling
+
+```{r}
+ set.seed(2334)
+ x = runif(1000000)
+ y = rbinom(x,1,plogis(-12+5*x))  
+ sum(y)
+ 
+ allind = 1:1000000
+ selind <- c(sample(allind[y==0],sum(y)),allind[y==1])
+ retrosmpl <- data.frame(x=x[selind],y=y[selind])
+ summary(glm(y~x,family=binomial,data=retrosmpl))
+ 
+ # alpha+log(pi0/pi1)
+ -12+log(1)-log(sum(y)/(1000000-sum(y)))
+ 
+```
+
+#### Analysis of mammal data
+
+```{r}
+library(MASS)
+
+data("mammals")
+
+plot(mammals$body,mammals$brain,log="xy",xlab="log(body)",ylab="log(brain)")
+
+mammals.lgnml<-lm(log(brain)~log(body),data=mammals)
+summary(mammals.lgnml)
+
+# gamma
+
+mammals.gamma<-glm(brain~log(body),Gamma(log),mammals)
+summary(mammals.gamma)
+
+gamma.dispersion(mammals.gamma)
+
+gamma.shape(mammals.gamma)
+
+# The dispersion estimate in the Gamma fit from summary is X2/(n − p). To calculate MLEs, use the MASS functions gamma.dispersion and gamma.shape.
+
+```
+
+
+**Multinomial logistic regression**
+
+
+#### Analysis of housing data
+```{r}
+library(MASS)
+data(housing)
+
+library(nnet) # multinom is a function in nnet
+
+fit1=stepAIC(multinom(Sat~Infl*Type*Cont,data=housing,weights=Freq))
+summary(fit1)
+
+Anova(fit1, type="III")
+
+p1=predict(fit1,type="prob") 
+head(p1)
+
+fit2=stepAIC(polr(Sat~Infl*Type*Cont,housing,Freq)) # polr is a function in MASS
+summary(fit2)
+Anova(fit2, type="III")
+p2=predict(fit2,type="prob") 
+  head(p2)
+```
+
+
+# Log-linear Models For Contingency Tables (loglin)
+
+#### Analysis of death penalty (two-way table)
+
+There are two variables: death penalty verdict (verdict) and defendant race (race). We are interested in if verdict depends on race, i.e. if the conditional probability P(verdict|race) is independent of race. Therefore, the stimulus variable is race and the response variable is verdict.
+
+```{r}
+
+death1 <- cbind(expand.grid(verdict=c("yes","no"),
+                  race=c("white","black")),
+                  ct=c(19,141,17,149))
+
+attach(death1)
+
+tab <- xtabs(ct ~ race + verdict)
+tab
+
+
+#Person’s Chi-square test for independence
+summary(tab)
+dotchart(tab)
+mosaicplot(tab, main=NULL)
+
+fit1 <- glm(ct ~ race*verdict, family = poisson)
+summary(fit1)
+
+# Logit model: since the response verdict takes two possible values, we can also fit the data as binomial.
+
+death1logit <- cbind(death1[verdict == "yes",],
+                     N = death1[verdict== "no", "ct"])
+
+fit2 <- glm(cbind(N, ct) ~ race, family = binomial,
+            data = death1logit)
+
+summary(fit2)
+
+
+### 3 way table
+
+x <- cbind(expand.grid(vr = c(0,1), dr = c(0,1)),
+           p = c(12.6,0,17.5,5.8))
+
+symbols(x[,2],x[,3],circles=c(151,9,63,103)/300,
+          xlim=c(-0.8,1.8),xlab="defendant’s race",
+          ylab="percent receiving death penalty",
+          inches=F, axes=F)
+box()
+ axis(2,cex=0.7)
+ axis(1,at=c(0,1),label=c("white","black"),cex=0.7)
+ points(x[x[,1]==0,2],x[x[,1]==0,3],pch="w")
+ points(x[x[,1]==1,2],x[x[,1]==1,3],pch="b")
+ lines(c(0,1),100*c(19/160,17/166),lty=2,pch="M",
+        type="b")
+
+death2 <- cbind(expand.grid(verdict = c("yes", "no"),
+                            vrace = c("white", "black"),
+                            drace = c("white", "black")),
+                ct = c(19,132,0,9,11,52,6,97))
+
+fit3 <- glm(ct ~ vrace*drace + verdict, family = poisson, data = death2)
+summary(fit3) 
+
+
+fit4 <- step(fit3, scale=1, trace=F,
+               scope=list(lower=formula(fit3),upper=~.^3))
+
+summary(fit4)
+
+
+
+death2logit <- cbind(death2[verdict == "yes"],
+                      N = death2[verdict == "no", "ct"])
+
+fit5 <- glm(cbind(N, ct) ~ vrace, family = binomial, data = death2logit)
+summary(fit5, correlation = F)
+
+# The death penalty data satisfies the Simpson’s paradox. For a contingency table, Simpson’s paradox is an example of the dangers of lurking variables.
+```
+
+##### Analysis of housing (four way table)
+The following table shows a four-way classification on 1681 households in Copenhagen who were survived on the type of rental accommodation they occupied, the degree of contact they had with other residents, their feeling of influence on apartment management and their level of satisfaction with their housing conditions.
+
+The goal is to investigate how the level of satisfaction depends on influence, type and contact. Therefore, we have the response variable satisfaction and three stimulus variables: influence, type and contact.
+
+```{r}
+library(MASS)
+data(housing)
+names(housing)
+
+# fit the minimal model
+fit0 <- glm(Freq~Infl*Type*Cont+Sat,
+              family=poisson, data=housing)
+
+summary(fit0)
+
+# Large deviance indicates the simple model is not adequate. We now build models using two approaches: bottom up and top down.
+
+##### 1. Bottom up
+
+# First, add main effects on three stimulus variables:
+fit1 <- update(fit0, .~. + Sat:(Infl+Type+Cont)) 
+summary(fit1)
+
+# No sign of lack-of-fit. To check individual terms,
+
+dropterm(fit1, test = "Chisq")
+
+#All main effects are significant. Now consider two-way interactions.
+addterm(fit1, ~ . + Sat:(Infl+Type+Cont)^2, test = "Chisq")
+
+
+##### 2. Top down
+
+
+fit2 <- step(fit0, scope=list(lower=formula(fit0),
+               upper=~.^3), scale=1)
+
+# Both approaches reach the same simple main effects only model.
+
+
+# Estimate cell probabilities
+
+hnames <- lapply(housing[,-5], levels)
+pm <- predict(fit1, expand.grid(hnames),
+              type = "response")
+
+pm <- matrix(pm, ncol = 3, byrow = T,
+             dimnames = list(NULL, hnames[[1]]))
+
+pr <- pm/drop(pm%*%rep(1,3))
+
+cbind(expand.grid(hnames[-1], prob = round(pr, 2)))
+```
+
+# Nonlinear regression model (nlm notes)
+
+
+#### Puromycin data
+Data on the ‘‘velocity’’ of an enzymatic reaction were obtained by Treloar (1974). The number of counts per minute of radioactive product from the reaction was measured as a function of substrate concentration in parts per million (ppm) and from these counts the initial rate, or ‘‘velocity,’’ of the reaction was calculated (counts/min/min). The experiment was conducted once with the enzyme treated with Puromycin, and once with the enzyme untreated.
+
+```{r}
+attach(Puromycin)
+
+plot(conc, rate, type = "n")
+text(conc, rate, ifelse(state == "treated", "T", "U"), cex = .8)
+
+## fit the treated subset
+
+Treated <- Puromycin[Puromycin$state == "treated",]
+
+fit1 <- nls(rate ~ Vm*conc/(K + conc), Treated,
+            list(Vm = 200, K = 0.1), trace = T)
+
+summary(fit1)
+
+
+## fit with provided first derivative 
+
+fg <- function(Vm, K, conc) {
+    temp1 <- K + conc
+    temp2 <- conc/temp1
+    model.func <- Vm * temp2
+    Z <- cbind(temp2, -Vm*conc/temp1^2)
+    dimnames(Z) <- list(NULL, c("Vm","K"))
+    attr(model.func, "gradient") <- Z
+    model.func
+}
+
+fit2 <- nls(rate ~ fg(Vm, K, conc), Treated,
+            list(Vm = 200, K = 0.1, trace = T))
+
+summary(fit2)
+
+## fit using symbolic differentiation
+
+fg1 <- deriv(rate ~ Vm*conc/(K + conc), c("Vm", "K"),
+             function(Vm, K, conc) NULL)
+
+fit3 <- nls(rate ~ fg1(Vm, K, conc), Treated,
+            list(Vm = 200, K = .1, trace = T))
+
+summary(fit3)
+
+
+## plot fits with 95% confidence intervals
+
+xx <- seq(0,1.2, length = 50)
+library(investr)
+
+
+p <- predFit(fit1, newdata=data.frame(conc=xx),
+               interval= "confidence", level = .95)
+
+
+pred <- data.frame(conc=xx, fit=p[,1], lwr=p[,2], upr=p[,3])
+
+library(ggplot2)
+f1 <- ggplot(Treated) +
+       geom_point(aes(x=conc, y=rate), size=2, colour= "black") +
+  xlab("concentration") +
+  ylab("rate")
+
+f1
+
+
+f1+  geom_line(data=pred, aes(x=conc, y=fit ))+
+      geom_ribbon(data=pred, aes(x=conc, ymin=lwr, ymax=upr),
+                  alpha = .5, inherit.aes = F, fill = "blue") +
+theme_classic()
+
+
+## plot 95% Confidence region for parameters
+
+se <- sqrt(diag(vcov(fit1)))
+dv <- sum(resid(fit1)^2)
+par(pty="s")
+bc <- coef(fit1)
+b1 <- bc[1] + seq(-3*se[1],3*se[1],length=50)
+b2 <- bc[2] + seq(-3*se[2],3*se[2],length=50)
+bv <- expand.grid(b1,b2)
+ssq <- function(b)
+ sum((Treated[,2]-b[1]*Treated[,1]/(b[2]+Treated[,1]))^2)
+db <- apply(bv, 1, ssq)
+fstat <- matrix(((db-dv)/2)/(dv/(length(Treated[,1])-2)), 50,50)
+plot(b1, b2, xlab="Vm", ylab="K", type="n")
+contour(b1, b2, fstat, levels=c(1,2,7,10,15,20), labex=0.75,
+        lty=2, add=T)
+contour(b1, b2, fstat, levels=qf(0.95,2,length(Treated[,1])-2),
+        add=T, labex=0, lwd=2)
+text(192,0.045,"95% CR", adj=0, cex=0.75)
+points(bc[1],bc[2],pch=3,mkh=0.1)
+
+
+# check linear approximation
+
+plot(profile(fit1), absVal = F)
+
+## fit full data
+
+fit4 <- nls(rate ~ (Vm+delV*(state=="treated"))*conc/
+            (K+delK*(state=="treated")+conc),
+            Puromycin, list(Vm=160,delV=40,K=0.1,delK=0))
+
+
+summary(fit4)
+
+
+```
+
+**Logistic model**
+(self starting logistic model)
+
+#### Analysis of COVID19
+
+```{r}
+library(dplyr)
+library(date)
+
+
+a <- read.csv("United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")
+
+b <- a%>%
+  group_by(submission_date)%>%
+  summarise(uscases=sum(tot_cases)/1000) 
+
+b$time <- as.numeric(as.Date(b$submission_date,"%m/%d/%Y") -as.Date("03/01/2020","%m/%d/%Y"))+1
+
+
+d <- filter(b, time>0&time<=31) # 3/1/2020-3/31/2020
+
+
+fit1 <- nls(uscases~SSlogis(time, Asym, xmid, scal), data=d) 
+summary(fit1)
+
+
+p <- predict(fit1, newdata=data.frame(time=1:36)) # 5 days prediction f <- fitted(fit1)
+f <- fitted(fit1)
+r <- residuals(fit1)
+
+nboot <- 1000
+bfit <- NULL
+for (i in 1:nboot) {
+y <- f+sample(r,r=T)
+tmpfit <- nls(y~SSlogis(time, Asym, xmid, scal), data=d)
+bfit <- cbind(bfit, predict(tmpfit, newdata=data.frame(time=1:36)))
+}
+
+plot(d$time,d$uscases, xlim=c(1,36), ylim=range(p, d$uscases), ylab="Total cases (thousands)", xlab="Date", type="n", axes=F)
+box()
+axis(2)
+axis(1, at=c(1,10,20,31,36), label=as.character(c("3/1/2020","3/10/2020","3/20/2020","3/31/2020","4/5/2020"))) 
+polygon(c(1:36,rev(1:36)), c(apply(bfit,1,quantile,.025),rev(apply(bfit,1,quantile,.975))),
+        col=rgb(red=0, green=0.5, blue=1.0, alpha=0.2), border=NA) 
+points(d$time,d$uscases, pch="o", cex=.5)
+lines(1:36, p, col="red")
+```
+
+#### Analysis of Old Faithful data
+
+This dataset contains measurements from the Old Faithful geyser in Yellowstone National Park from August 1 to August 15, 1985. There are 272 observations on two variables:
+duration: the eruption time in minutes
+waiting: the waiting time in minutes to the next eruption
+The National Park Service would like to predict the time until the next eruption, so that tourists can be sure to see it. Therefore, the goal is to build a mathematical model that relates the waiting time to the duration of the previous eruption.
+
+```{r}
+library(assist) 
+
+attach(faithful)
+
+fg <- function(a,b,d,e,x) {
+  x0 <- (d-a)/(b-e)
+  model.func <- a + b*x
+  Z <- cbind(1,x,0,0)
+  model.func[x>x0] <- d + e*x[x>x0]
+  Z[x>x0,] <- cbind(0,0,1,x[x>x0])
+  dimnames(Z) <- list(NULL, c("a","b","d","e")) 
+  attr(model.func, "gradient") <- Z
+model.func 
+}
+
+
+
+p1 <- lm(waiting~eruptions, subset=eruptions<3.5)$coef 
+p2 <- lm(waiting~eruptions, subset=eruptions>3.5)$coef 
+
+fit1 <- nls(waiting ~ fg(a,b,d,e,eruptions), trace=T, control=list(tolerance=0.01),start=list(a=p1[1],b=p1[2],d=p2[1],e=p2[2])) 
+
+summary(fit1)
+```
+
+# Nonparametric Regression
+
+#### Old Faithful geyser
+
+```{r}
+library(assist) 
+attach(faithful)
+
+geyser.para.fit <- lm(waiting~eruptions)
+plot(eruptions,waiting,xlab="duration (mins)",ylab="waiting (mins)",type="n") 
+points(eruptions,waiting,pch="o",cex=.5) 
+lines(sort(eruptions),geyser.para.fit$coef[1]+geyser.para.fit$coef[2]*sort(eruptions))
+
+plot(eruptions, geyser.para.fit$resi,xlab="duration (mins)", ylab="residuals (mins)",type="n")
+points(eruptions, geyser.para.fit$resi, pch="o",cex=.5) 
+lines(smooth.spline(eruptions,geyser.para.fit$resi))
+
+plot(eruptions,waiting,xlab="duration (mins)",ylab="waiting (mins)",type="n") 
+points(eruptions,waiting,pch="o",cex=.5) 
+lines(smooth.spline(eruptions,waiting,all.knots=T))
+```
+
+#### Motorcycle data
+
+These data come from a simulated motorcycle crash experiment on the efficacy of crash helmets. The dataset contains 133 measurements on two variables from a subject:
+
+accel: head acceleration in g
+time: time after impact in milliseconds
+
+The goal is to build a mathematical model that relates the acceleration to time.
+
+**Polynomial fit**
+
+```{r}
+library(MASS) 
+attach(mcycle)
+
+
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)", xlim=c(0,60), type="n", axes=F) 
+box()
+axis(2)
+axis(1, at=c(0,10,20,30,40,50,60), label=as.character(c(0,10,20,30,40,50,60)), cex=.5) 
+points(times, accel, pch="o", cex=.5)
+
+tmp <- lm(accel~times+I(times^2)+I(times^3)+I(times^4)+I(times^5)+I(times^6)+I(times^7) +I(times^8)+I(times)^9+I(times^10)+I(times^11)+I(times^12)+I(times^13) +I(times^14)+I(times^15)+I(times^16)+I(times^17)+I(times^18)+I(times^19) +I(times^20))
+X <- model.matrix(tmp)[,-1] 
+e <- eigen(t(X)%*%X) 
+sqrt(e$val[1]/e$val)
+
+tmp1 <- lm(accel ~ poly(times, degree = 20)) # poly computes orthogonal polynomials
+X <- model.matrix(tmp1)[,-1]
+e <- eigen(t(X)%*%X)
+sqrt(e$val[1]/e$val)
+
+poly.fit <- step(tmp, direction="both") 
+opoly.fit <- step(tmp1, direction="both")
+
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)", xlim=c(0,60), type="n", axes=F) 
+box()
+axis(2)
+axis(1, at=c(0,10,20,30,40,50,60), label=as.character(c(0,10,20,30,40,50,60)), cex=.5) 
+points(times, accel, pch="o", cex=.5)
+lines(seq(min(times),max(times),len=100),
+predict(poly.fit, data.frame(times=seq(min(times),max(times),len=100))), col=1)
+lines(seq(min(times),max(times),len=100),
+predict(opoly.fit, data.frame(times=seq(min(times),max(times),len=100))), col=2)
+lines(smooth.spline(times, accel, all.knots=T), col=3)
+legend(2, 60, legend=c("polynomial", "orthogonal polynomial","cubic spline"),
+lty=rep(1,3), col=1:3, cex=.5)
+
+```
+
+#### Scatter smoothing
+
+**Kernal smoother**
+```{r}
+ker.fit <- ksmooth(times, accel, kernel="normal", bandwidth=4)
+```
+
+**local regression**
+
+```{r}
+locreg.fit <- lowess(times,accel,f=1/8)
+```
+
+**Regression spline**
+
+```{r}
+library(splines)
+csfit1 <- lm(accel~bs(times, degree=3, knots=c(20,40)))
+csfit2 <- lm(accel~bs(times, degree=3, df=8))
+csfit3 <- lm(accel~ns(times, df=8))
+
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)", xlim=c(0,60), type="n", axes=F) 
+box()
+points(times, accel, pch="o", cex=.5)
+
+
+```
+**Smoothing spline**
+
+```{r}
+
+csfit4 <- smooth.spline(times, accel, df=8)
+
+
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)", xlim=c(0,60), type="n", axes=F) 
+box()
+points(times, accel, pch="o", cex=.5)
+lines(smooth.spline(times, accel, df=8), col = "red")
+
+
+
+```
+
+**smoothing parameter**
+
+```{r}
+
+par(mfrow = c(2,2))
+la=2^{1:(-2)}
+for (i in 1:4) {
+  plot(times, accel, xlab="time (ms)", ylab="acceleration (g)",
+       xlim=c(0,60), type="n", axes=F)
+  box()
+  axis(2)
+  axis(1, at=c(0,10,20,30,40,50,60),
+        label=as.character(c(0,10,20,30,40,50,60)), cex=.5)
+  points(times, accel, pch="o", cex=.5)
+  lines(smooth.spline(times, accel, spar=la[i]))
+  mtext(paste("lambda=",as.character(la[i])),cex=.8)
+}
+```
+**Cross-validation and generalized cross-validation**
+
+```{r}
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)", xlim=c(0,60), type="n", axes=F) 
+box()
+points(times, accel, pch="o", cex=.5)
+lines(smooth.spline(times, accel, cv=T), col = "red")
+lines(smooth.spline(times, accel), col = "green")
+```
+**fit with 95% confidence intervals**
+
+```{r}
+library(assist)
+mcycle.cubic.fit <- ssr(accel~times,rk=cubic2(times))
+grid <- seq(min(times),max(times),len=100)
+mcycle.cubic.pred <- predict(mcycle.cubic.fit,
+                                 data.frame(times=grid))
+#pdf(file="mcycle10.pdf", height=3.5,width=4.5,pointsize=8)
+plot(times, accel, xlab="time (ms)", ylab="acceleration (g)",
+     xlim=c(0,60), type="n", axes=F)
+box()
+axis(2)
+axis(1, at=c(0,10,20,30,40,50,60),
+      label=as.character(c(0,10,20,30,40,50,60)), cex=.5)
+polygon(c(grid,rev(grid)),
+        c(mcycle.cubic.pred$fit-1.96*mcycle.cubic.pred$pstd,
+          rev(mcycle.cubic.pred$fit+1.96*mcycle.cubic.pred$pstd)),
+          col=rgb(red=0, green=0.5, blue=1.0, alpha=0.2), border=NA)
+points(times, accel, pch="o", cex=.5)
+lines(grid,mcycle.cubic.pred$fit, col="red")
+```
+#### Generalized Additive Modle
+
+##### Analysis of Rock data
+
+Measurements on Petroleum Rock Samples
+Description:
+  Measurements on 48 rock samples from a petroleum reservoir.
+A data frame with 48 rows and 4 numeric columns.
+[,1] area area of pores space, in pixels out of 256 by 256
+[,2] peri perimeter in pixels
+[,3] shape perimeter/sqrt(area)
+[,4] perm permeability in milli-Darcies
+
+```{r}
+library(MASS)
+attach(rock)
+
+par(mfrow = c(2,2))
+plot(area,log(perm), cex=.5)
+lines(lowess(area,log(perm)))
+
+plot(peri,log(perm),cex=.5)
+lines(lowess(peri,log(perm)))
+
+plot(shape,log(perm),cex=.5)
+lines(lowess(shape,log(perm)))
+
+
+# build model
+
+rock.lm <- lm(log(perm) ~ area + peri + shape) 
+summary(rock.lm)
+
+
+# diagnostic plots
+
+par(mfrow = c(2,2))
+
+pr <- residuals(rock.lm)+coef(rock.lm)[2]*area 
+plot(area,pr, cex=.5, ylab="Partial residuals") 
+abline(0,coef(rock.lm)[2]) 
+lines(lowess(area,pr), col="red", lty=2)
+
+
+pr <- residuals(rock.lm)+coef(rock.lm)[3]*peri 
+plot(peri,pr, cex=.5, ylab="Partial residuals") 
+abline(0,coef(rock.lm)[3]) 
+lines(lowess(peri,pr), col="red", lty=2)
+
+
+pr <- residuals(rock.lm)+coef(rock.lm)[4]*shape 
+plot(shape,pr, cex=.5, ylab="Partial residuals") 
+abline(0,coef(rock.lm)[4]) 
+lines(lowess(shape,pr), col="red", lty=2)
+
+
+# GAMs
+library(gam)
+rock.gam <- gam(log(perm) ~ s(area) + s(peri) + s(shape)) 
+summary(rock.gam)
+
+plot(rock.gam, residuals = T, se=T, rug=F) # points are partial resid
+
+
+# GAMS 2.0
+
+rock.gam1 <- gam(log(perm) ~ area + peri + s(shape))
+summary(rock.gam1)
+
+plot(rock.gam1, residuals = T, se=T, rug=F)
+
+# GAMS 3.0
+
+rock.gam2 <- gam(log(perm) ~ area + peri + bs(shape,knots=0.15,degree=1)) 
+summary(rock.gam2)
+
+plot(rock.gam2, residuals = T, se=T, rug=F)
+
+# compare gams
+
+anova(rock.lm,rock.gam2,rock.gam1,rock.gam)
+anova(rock.lm,rock.gam2,rock.gam1,rock.gam,test="Cp")
+
+# different ways to model each variable
+ rock.gam3 <- gam(log(perm) ~ s(area) + peri + lo(shape))
+ rock.gam4 <- gam(log(perm) ~ area + peri + s(shape,df=6))
+ rock.gam5 <- gam(log(perm) ~ lo(area) + poly(peri,4) + ns(shape,df=4))
+```
+#### Analysis of birth weight data
+
+```{r}
+attach(birthwt)
+
+birthwt$smoke <- as.factor(birthwt$smoke)
+gam.fit1 <- gam(low ~ s(age, df=6) + s(lwt) + smoke + ptl + ht + ui + ftv, binomial) 
+summary(gam.fit1)
+
+par(mfrow=c(3,3), mgp=c(2,1,0), mar=c(3,3,2,1)+.1) 
+plot(gam.fit1, se=T)
+
+
+
+age1 <- age*(ftv=="1")
+age2 <- age*(ftv=="2+")
+gam.fit2 <- gam(low ~ s(age,df=6) + s(lwt) + smoke + ptl + ht + ui + ftv + s(age1) + s(age2) + smoke:ui, binomial)
+summary(gam.fit2)
+
+par(mfrow=c(3,3), mgp=c(2,1,0), mar=c(3,3,2,1)+.1) 
+plot(gam.fit2, se=T)
+```
+
