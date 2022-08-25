@@ -1,0 +1,1357 @@
+---
+title: "PSTAT220C_LectureCode"
+author: "sbsambado"
+date: "5/9/2022"
+output: html_document
+---
+
+# PSTAT 220C- Spring 2022
+
+## Mengyang Gu
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Week 1
+
+####1. density/probability distribution, percentile, quantile, 
+```{r}
+#1. density/probability distribution, percentile, quantile, 
+##normal
+dnorm(0.5,mean=0,sd=1) ##density of standard normal distribution at x=0.5
+pnorm(0.5,mean=0,sd=1) ##percentile (cumulative distribution function) of standard normal distribution when x is not larger than 0.5
+qnorm(0.5,mean=0,sd=1)  ##quantile of standard normal distribution: 0.5=Pr(x<=q), where q is the quantile at 0.5 (which is the median as this is a continuous distribution)
+rnorm(1,mean=0,sd=1)  ## random number of normal distribution
+
+##gamma distribution
+dgamma(0.3,shape=2,rate=3) ##density of standard normal distribution at x=.3
+pgamma(1,shape=2,rate=3) ##percentile (cumulative distribution function) of gamma(2,3) when x is not larger than 1
+qgamma(0.2,shape=2,rate=3)  ##quantile of gamma(2,3) 0.2=Pr(x<=q)
+
+##uniform distribution
+dunif(0.3) ##density of standard normal distribution at x=.3
+punif(0.2) ##percentile (cumulative distribution function) of unif(0,1) when x is not larger than 0.2
+qunif(0.4)  ##quantile of unif(0,1) 0.2=Pr(x<=q)
+
+
+```
+
+
+####2. vector   
+```{r}
+#2. vector   
+u=runif(5) ##5-vector vector from the uniform distribution
+as.vector(u)
+matrix(u,5,1)
+#set specific seed
+set.seed(1)
+u=runif(5) ##
+v=runif(5)
+
+##equally space from 0 to 1
+#v=seq(0,1,1/99)
+#v
+#get the second entry 
+u[2]
+#vector  multiplication (inner product)
+w=t(v)%*%u ##valu same as sum(v*u )
+w ##1 by 1 matrix
+sum(v*u ) ##a scalar 
+
+##element product
+v*u ##return a vector
+
+## outer product 
+A=v%*%t(u)
+
+## one good thing is that R has many available functions. 
+##E.g. the rank of the matrix is implemented in the Matrix package
+##install.packages("Matrix") ##if you didn't install this packagee
+library(Matrix)
+rankMatrix(A) ##in principle, you can show a column can be represented as a linear combination of other columns
+
+##special matrices
+n=5
+identity_mat=diag(n) ###n x n identity matrix
+###change the diagonal to be 4
+diag(identity_mat)=4
+identity_mat
+
+##change the (2,3) entry to be 1
+identity_mat[2,3]=1
+identity_mat
+
+```
+
+####3. matrix
+```{r}
+##3. matrix
+###n by n matrix, each entry randomly follows a uniform distribution
+##set speecific seed
+set.seed(0)
+A=matrix(runif(n^2),n,n)
+rankMatrix(A) ##rank of A
+dim(A)  ##dimension of A
+
+
+
+##A and its transpose
+A
+t(A)
+
+eigen_A=eigen(A) ##eigendecomposition of A
+eigen_A$values
+eigen_A$vectors
+
+B=matrix(runif(n^2),n,n)
+
+##matrix product 
+C=A%*%B
+
+##elementwise product 
+D=A*B
+
+##kroncker product 
+E=kronecker(A,B,'*')
+
+##check this is what we think
+E[1:n,1:n]-A[1,1]*B
+E[1:n,(n+1):(2*n)]-A[1,2]*B
+E[(n+1):(2*n),(n+1):(2*n)]-A[2,2]*B
+
+##inversion of A, not all matrix can be inverted 
+##usually we do not compute the inverse directly. we will discuss later
+A_inv=solve(A)
+A%*%A_inv
+
+
+##create a positive definite matrix
+G=A%*%t(A)
+G_eigen=eigen(G)
+G_eigen$values  ##positive eigenvalues
+kappa(G,exact = TRUE) ##condition number
+kappa(G) ##approximate condition number because computating the eigenvalus or svd is too costly
+G_eigen$values[1]/G_eigen$values[n]
+
+##singular value decomposition
+A_svd=svd(A)
+##connection between svd and eigen
+A_svd$d*A_svd$d-G_eigen$values
+abs(A_svd$u)- abs(G_eigen$vectors) 
+
+##svd can apply to n_1 x n_2 matrix while eigendecomposition can only apply to a squared matrix
+
+##cholsky decomposition
+L=t(chol(G))
+L
+L%*%t(L)-G
+
+
+#determinant
+det_G=det(G)
+prod(diag(L)^2) ##use cholesky decomposition to compute the determinant 
+
+##log determinant
+determinant(G)$modulus
+log_det_G=determinant(G)$modulus[1]
+log_det_G
+2*sum(log(diag(L)))  ###use logarithm of the cholesky decomposition to compute the determinant 
+
+
+```
+
+
+####4. Comparing two different ways to compute G^{-1} y
+
+```{r}
+###4. Comparing two different ways to compute G^{-1} y
+y=runif(n)
+
+##first way, direct inversion, not stable when the matrix is near singular  
+G_inv_y_1=solve(G)%*%y
+
+##second way, use cholesky and forward/backward substitution
+L=t(chol(G))
+G_inv_y_2=as.matrix(backsolve(t(L), forwardsolve(L,y)))
+##comparing 
+G_inv_y_2-G_inv_y_1
+
+###Let's compare some robustness between directly applying cholesky decomposition and inversion
+n=400
+x=seq(0,1,1/(n-1))
+R0=abs(outer(x,(x),'-'))
+
+##the larger the gamma, the more singular the matrix is  
+gamma=20
+R=exp(-(R0/gamma)^{1.99})
+##the truth is e_1=(1,0,...,0)^T
+sol_1=solve(R)%*%R[,1]
+L=t(chol(R))
+sol_2=(backsolve(t(L), forwardsolve(L,R[,1])))
+
+##RMSE root of mean squared error
+sqrt(mean((sol_1-c(1,rep(0,n-1)))^2))
+sqrt(mean((sol_2-c(1,rep(0,n-1)))^2))
+##computational time 
+##using cholesky decomposition is around three-four times faster
+##we will learn to use connecting R with C++ in the future
+system.time(
+  solve(R)%*%R[,1]
+)
+system.time(
+  for(t in 1:1){
+    L=t(chol(R))
+    sol_2=(backsolve(t(L), forwardsolve(L,R[,1])))
+  }
+)
+
+##let's see how the error change along with parameter gamma
+
+gamma_record=seq(1,20,1) 
+
+M=length(gamma_record)
+cond_num_approx=rep(0,M) ##record the approximate condition number
+RMSE_1=rep(0,M)
+RMSE_2=rep(0,M)
+for(i in 1:M){
+    R=exp(-(R0/gamma_record[i])^{1.99})
+    cond_num_approx[i]=kappa(R)
+    ##let's look at the second one
+    sol_1=solve(R)%*%R[,2]
+    RMSE_1[i]=sqrt(mean( (sol_1-c(0,1,rep(0,n-2)))^2))
+    L=t(chol(R))
+    sol_2=(backsolve(t(L), forwardsolve(L,R[,2])))
+    RMSE_2[i]=sqrt(mean( (sol_2-c(0,1,rep(0,n-2)))^2))
+}
+
+##you may save this figure as a pdf
+#pdf(file='RMSE_Cholesky_inversion_comparison.pdf',height=4,width=6)
+plot(gamma_record,RMSE_1,xlab=expression(gamma),ylab='RMSE')
+lines(gamma_record,RMSE_2,xlab=expression(gamma),ylab='RMSE',type='p',pch=20)
+legend('topleft',legend=c('Direct inversion','Cholesky'),pch=c(1,20))
+#dev.off()
+
+```
+
+
+####5 tensor 
+
+```{r}
+##5 tensor 
+library(rTensor)
+##feel free to explore more
+#
+mat <- matrix(seq(1,1000),nrow=100,ncol=10)
+
+tnsr=as.tensor(array(mat,c(20,5,10)))
+dim(tnsr)
+tnsr@modes
+dim(tnsr@data)
+tnsr@data[,1,1]
+
+tnsr_size=dim(tnsr)
+
+
+## mode 1 product and mode 2 product
+mat_1=matrix(seq(1,20),4,20)
+mat_2=matrix(seq(1,40,1),2,5 )
+d_1=dim(mat_1)[1]
+d_2=dim(mat_2)[1]
+  
+
+tnsr_1=ttm(tnsr, mat_1, m = 1)
+dim(tnsr_1)
+tnsr_2=ttm(tnsr_1, mat_2, m = 2)
+dim(tnsr_2)
+
+##the following tensor product can be reproduced using matrix product 
+matrix_1=(mat_1)%*%matrix(mat,tnsr_size[1], tnsr_size[2]*tnsr_size[3])
+matrix_2=(mat_2)%*%matrix(t(matrix_1),tnsr_size[2],d_1*tnsr_size[3])
+matrix_ans=t(matrix(t(matrix_2),tnsr_size[3],d_1*d_2))
+
+##check 
+tnsr_2@data-array(matrix_ans,c(d_1,d_2,tnsr_size[3]))
+matrix(tnsr_2@data,d_1*d_2,tnsr_size[3])-matrix_ans
+
+```
+
+### Week 2
+
+```{r}
+# library(Rcpp)
+# library(RcppEigen)
+# sourceCpp(file="~/Google Drive/PSTAT_220C/src/demo.cpp") 
+# 
+# n=10^8
+# 
+# 
+# ###1. comparing time for one loop
+# #C++
+# time1=system.time(
+#   for(i in 1:1){
+#     ans1=Test_for_loop(n)
+#   }
+# )
+# #R
+# ans2=0
+# time2=system.time(
+#   for(i in 1:n){
+#     ans2=ans2+0.1
+#   }
+# )
+# time1
+# time2
+# 
+# ##2. Cholesky
+# n=600
+# x=seq(0,1,1/(n-1))
+# R0=abs(outer(x,(x),'-'))
+# ##the larger the gamma, the more singular the matrix is  
+# gamma=.1
+# R=exp(-(R0/gamma)^{1.9})
+# 
+# #C++
+# system.time(
+#   for(i in 1:1){
+#    L1=Chol(R)
+#   }
+# )
+# ##R
+# system.time(
+#   for(i in 1:1){
+#     L2=t(chol(R))
+#   }
+# )
+# max(abs(L1-L2)) ##difference
+# 
+# ###R_inv y
+# y=runif(n)
+# ##C++
+# system.time(
+#   for(i in 1:1){
+#     R_inv_y_1=R_inv_y(R, y)
+#   }
+# )
+# ##R
+# system.time(
+#   for(i in 1:1){
+#     L2=t(chol(R))
+#     R_inv_y_2=(backsolve(t(L2), forwardsolve(L2,y)))
+#   }
+# )
+# 
+# #direct inverse
+# system.time(
+#   for(i in 1:1){
+#     R_inv_y_3=solve(R)%*%y 
+#   }
+# )
+
+
+
+```
+
+## Week 3
+
+```{r}
+##1. Sample a multivariate normal 
+##suppose we want to sample y \sim MN(mu, \Sigma), where \Sigma=L L^T
+##one can sample by e.g. y=mu+L%*%z, where mu is the mean, L is Cholesky decomposition, z is i.i.d. normal
+
+##here I give an example for y \sim MN(mu, \Sigma), where mu =1, \Sigma follows a power exponential covariance with variance 4
+x=as.numeric(seq(0.01,1,0.01))
+n=length(x)
+R0=abs(outer(x,(x),'-'))
+##the larger the gamma, the more singular the matrix is  
+gamma=1
+Sigma=4*exp(-(R0/gamma)^{1.9}) ##suppose this is the covariance
+L=t(chol(Sigma))
+y=rep(1,n)+L%*%rnorm(n)
+y
+
+##since I code the covariance by power exponential kernel, it is like a function
+plot(x,y)
+
+
+
+###2. RobustGaSP is surrogate model to approximate nonlinear function
+###see the gu.R code for the package paper
+library(RobustGaSP)
+
+set.seed(1)
+#library(lhs)
+#input <- 10*maximinLHS(n=15, k=1) 
+input=10*seq(0,1,1/14) ##equally spaced
+output<-higdon.1.data(input)
+model<- rgasp(design = input, response = output)
+model
+
+plot(model)
+
+testing_input = as.matrix(seq(0,10,1/100))
+model.predict<-predict(model,testing_input)
+names(model.predict)
+
+
+#########plot predictive distribution
+testing_output=higdon.1.data(testing_input)
+pdf('pred_1D.pdf',height=5,width=7)
+plot(testing_input,model.predict$mean,type='l',col='blue',
+     xlab='x',ylab='y')
+polygon( c(testing_input,rev(testing_input)),c(model.predict$lower95,
+                                               rev(model.predict$upper95)),col = "grey80", border = F)
+lines(testing_input, testing_output)
+lines(testing_input,model.predict$mean,type='l',col='blue')
+lines(input, output,type='p')
+dev.off()
+
+##########plot sampling distribution
+pdf('pred_sample_1D.pdf',height=5,width=7)
+model.sample=simulate(model,testing_input,num_sample=10)
+matplot(testing_input,model.sample, type='l',xlab='x',ylab='y',ylim=)
+lines(input,output,type='p')
+dev.off()
+
+
+##test a 2D function 
+##this is a 2D Branin function from SFU
+branin <- function(xx, a=1, b=5.1/(4*pi^2), c=5/pi, r=6, s=10, t=1/(8*pi))
+{
+  ##########################################################################
+  #
+  # BRANIN FUNCTION
+  #
+  # Authors: Sonja Surjanovic, Simon Fraser University
+  #          Derek Bingham, Simon Fraser University
+  # Questions/Comments: Please email Derek Bingham at dbingham@stat.sfu.ca.
+  #
+  # Copyright 2013. Derek Bingham, Simon Fraser University.
+  #
+  # THERE IS NO WARRANTY, EXPRESS OR IMPLIED. WE DO NOT ASSUME ANY LIABILITY
+  # FOR THE USE OF THIS SOFTWARE.  If software is modified to produce
+  # derivative works, such modified software should be clearly marked.
+  # Additionally, this program is free software; you can redistribute it 
+  # and/or modify it under the terms of the GNU General Public License as 
+  # published by the Free Software Foundation; version 2.0 of the License. 
+  # Accordingly, this program is distributed in the hope that it will be 
+  # useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+  # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+  # General Public License for more details.
+  #
+  # For function details and reference information, see:
+  # http://www.sfu.ca/~ssurjano/
+  #
+  ##########################################################################
+  #
+  # INPUTS:
+  #
+  # xx = c(x1, x2)  #x1 in [-5, 10], x2 in [0, 15]
+  # a = constant (optional), with default value 1
+  # b = constant (optional), with default value 5.1/(4*pi^2)
+  # c = constant (optional), with default value 5/pi
+  # r = constant (optional), with default value 6
+  # s = constant (optional), with default value 10
+  # t = constant (optional), with default value 1/(8*pi)
+  #
+  ##########################################################################
+  
+  x1 <- xx[1]
+  x2 <- xx[2]
+  
+  term1 <- a * (x2 - b*x1^2 + c*x1 - r)^2
+  term2 <- s*(1-t)*cos(x1)
+  
+  y <- term1 + term2 + s
+  return(y)
+}
+
+
+###Branian
+library(lhs) 
+input_ori=maximinLHS(n=36, k=2) ##this is from a maximin latin hypercube
+input=input_ori
+##lattice
+# N=36
+# n=sqrt(N)
+# input_ori=matrix(NA,N,2)
+# input=matrix(NA,N,2)
+# input_ori[,1]=rep(as.numeric(seq(0,1,1/(n-1))),n)
+# input_ori[,2]=as.vector(t(matrix(as.numeric(seq(0,1,1/(n-1))),n,n )))
+input[,1]=-5+input_ori[,1]*20
+input[,2]=0+input_ori[,2]*15
+
+
+num_obs=dim(input)[1]
+p=dim(input)[2]
+output=matrix(0,num_obs,1)
+for(j in 1:num_obs){
+  output[j]=branin(input[j,])
+}
+
+library(fields)
+num_testing=10000
+grid.list=list(x=seq(0,1,1/99), y=seq(0,1,1/99))## use field package
+testing_input_ori=make.surface.grid(grid.list)
+
+testing_input=testing_input_ori
+testing_input[,1]=-5+testing_input_ori[,1]*20
+testing_input[,2]=0+testing_input_ori[,2]*15
+
+
+model<- rgasp(design = input, response = output)
+model
+
+
+###
+model.predict<-predict(model,testing_input)
+names(model.predict)
+
+#pdf('prediction_2D.pdf',height=5,width=7)
+quilt.plot(x=(testing_input[,1]), y=(testing_input[,2]), z=model.predict$mean,
+           nrow = 100, ncol = 100,main='GaSP',xlab=expression(x[1]), ylab=expression(x[2]))
+lines(input[,1], input[,2],type='p',pch=1)
+#dev.off()
+
+testing_output=matrix(0,num_testing,1)
+
+for(j in 1:num_testing){
+  testing_output[j]=branin(testing_input[j,])
+}
+
+#pdf('truth_2D.pdf',height=5,width=7)
+quilt.plot(x=(testing_input[,1]), y=(testing_input[,2]), z=testing_output,
+           nrow = 100, ncol = 100,main='Truth',zlim=c(-5,310),
+           xlab=expression(x[1]), ylab=expression(x[2]))
+#dev.off()
+
+sqrt(mean((model.predict$mean-testing_output)^2))/sd(testing_output)
+
+
+##see wjat they are if we have noise in the data
+output=matrix(0,num_obs,1)
+for(j in 1:num_obs){
+  output[j]=branin(input[j,])+rnorm(1,mean=0,sd=1)
+}
+
+##nugget
+model_tilde<- rgasp(design = input, response = output,nugget.est=T)
+model_tilde
+
+##
+model_tilde.predict<-predict(model_tilde,testing_input)
+names(model_tilde.predict)
+##
+
+quilt.plot(x=(testing_input[,1]), y=(testing_input[,2]), z=model.predict$mean,
+           nrow = 100, ncol = 100,main='GaSP with noisy observations',xlab=expression(x[1]), ylab=expression(x[2]))
+lines(input[,1], input[,2],type='p',pch=1)
+
+##RMSE
+sqrt(mean((model_tilde.predict$mean-testing_output)^2))/sd(testing_output)
+
+
+```
+## week 4
+
+```{r}
+x=c(-1,-.1,.16,.41,.80,1.26,1.54,1.71,2.3)
+
+qqnorm(x)
+qqline(x, col = "steelblue", lwd = 1)
+
+
+qqp=qqnorm(x,plot.it=F)
+##correlation coefficient in qq plot
+cor(qqp$x,qqp$y)
+
+
+#ppoints is a sequence of probability points 
+##check ? ppoints to see definition
+##plotting over chisq
+##theoretical comparison
+##qqplot is quantile-quantile plot to any distribution 
+qqplot(qnorm(ppoints(30)), qchisq(ppoints(30),df=3))
+
+##need to compare
+set.seed(1)
+chisq_samples=rchisq(30,df=3)
+qqnorm(chisq_samples,ylim=c(-2,6))
+qqline(x, col = "steelblue", lwd = 1)
+
+##correlation coefficient in qq plot
+qqp=qqnorm(x,plot.it=F)
+cor(qqp$x,qqp$y)
+
+###look at Cauchy 
+##heavy tail 
+qqplot(qnorm(ppoints(30)), qcauchy(ppoints(30)))
+
+##it is not easy to identify the difference 
+qqplot(qnorm(ppoints(30)), qt(ppoints(30),df=5))
+qqplot(qnorm(ppoints(30)), qt(ppoints(30),df=10))
+
+
+
+####plot of 2D multivariate normal 
+
+mu=as.matrix(c(0.5,1))
+Sigma=1.5^2*matrix(c(1,0.7,0.7,1),2,2)
+
+###there are many packages to compute the multivariate normal densiy
+###you can also code your function 
+library(mvtnorm)
+
+x_mat=matrix(seq(-5,5,0.1),
+             length(seq(-5,5,0.1)),
+             length(seq(-5,5,0.1)))
+n=100
+density_mat=matrix(NA, n,n)
+##this is not efficient 
+for(i in 1:n){ 
+  for(j in 1:n){
+    density_mat[i,j]=dmvnorm(c(i/n*10-5,j/n*10-5), mean=mu,sigma=Sigma)
+  }
+}
+
+##sample some
+set.seed(1)
+samples=rmvnorm(200,mean=mu,sigma=Sigma)
+
+
+eigen_Sigma=eigen(Sigma)
+
+pdf(file='bivariate_norm.pdf',height=6,width=6)
+contour(x=seq(0.1-5,5,0.1), y=seq(0.1-5,5,0.1), density_mat,
+        xlab='x',ylab='y')
+
+slope=eigen_Sigma$vectors[2,1]/eigen_Sigma$vectors[1,1]
+
+intercept=mu[2]-slope*mu[1]
+
+abline(a=intercept,
+       b= slope)
+
+slope=eigen_Sigma$vectors[2,2]/eigen_Sigma$vectors[1,2]
+intercept=mu[2]-slope*mu[1]
+
+abline(a=intercept,
+       b= slope)
+lines(samples,type='p',pch=20)
+dev.off()
+
+##exploring bi-variate data
+library(car)
+
+##here are the demo code from car package
+##draw ellipse for bivariate data 
+dataEllipse(Duncan$income, Duncan$education, levels=0.1*1:9, 
+            ellipse.label=0.1*1:9, lty=2, fill=TRUE, fill.alpha=0.1)
+##plot a certain point  in the map 
+points(50,50,col="red", pch=19)
+
+?dataEllipse
+##adjust the limit 
+dataEllipse(Duncan$income, Duncan$education, levels=0.1*1:9, 
+            ellipse.label=0.1*1:9, lty=2, fill=TRUE, fill.alpha=0.1,xlim=c(0,100),ylim=c(0,120))
+
+
+
+```
+
+## Week 5
+
+```{r}
+###linear regression with scalar input
+###code from Sunpeng Duan, PSTAT, TA 220C, 2021
+data("airquality")
+attach(airquality)
+air <- na.omit(airquality)
+detach(airquality)
+attach(air)
+
+
+
+fit0 <- lm(Ozone ~ 1, data=air)
+fit1 <- lm(Ozone ~ Solar.R, data=air)
+fit2 <- lm(Ozone ~ Solar.R + Wind, data=air)
+fit3 <- lm(Ozone ~ Solar.R + Wind + Temp, data=air)
+
+anova(fit0, fit1, fit2, fit3)
+anova(fit3)
+
+
+library(car)
+Anova(fit3, type="III")
+
+confint(fit3)
+
+confidenceEllipse(fit3,c(3,4))
+abline(v=confint(fit3)[3,],lty=2)
+abline(h=confint(fit3)[4,],lty=2)
+
+
+###multivariat multiple linear regression 
+###code from https://bookdown.org/egarpor/PM-UC3M/lm-iii-mult.html
+###take a look on it 
+data(iris) 
+summary(iris)
+dim(iris)
+iris[1,]
+
+### fit two responses Petal.Width, Petal.Length using Sepal.Length, Sepal.Width, Species as covariance
+fit_Iris <- lm(cbind(Petal.Width, Petal.Length) ~ 
+                Sepal.Length + Sepal.Width + Species, data = iris)
+summary(fit_Iris)
+
+##coeffiicent is a matrix
+fit_Iris$coefficients
+#fitted value is also a matrix
+fit_Iris$fitted.values
+#residuals
+fit_Iris$residuals
+
+##fit individual models
+fitIris1 <- lm(Petal.Width ~Sepal.Length + Sepal.Width + Species, data = iris)
+fitIris2 <- lm(Petal.Length ~Sepal.Length + Sepal.Width + Species, data = iris)
+summary(fitIris1)
+summary(fitIris2)
+
+##note that fit and residuals are the same 
+fit_Iris$coefficients-cbind(fitIris1$coefficients, fitIris2$coefficients)
+fit_Iris$fitted.values-cbind(fitIris1$fitted.values, fitIris2$fitted.values)
+fit_Iris$residuals-cbind(fitIris1$residuals, fitIris2$residuals)
+
+```
+
+## Week 6
+```{r}
+
+###simulate a simple scenario 
+library(FastGaSP)
+
+##simulate a multivariate normal 
+##have to be sorted to put in DLM
+set.seed(10)
+x=as.numeric(seq(0.001,1,0.001))
+n=length(x)
+##the larger the gamma, the more singular the matrix is  
+gamma=1/2
+sigma_2=1   ### This parameter can easily handled, you can change it to other value
+sigma_2_0=0.5^2
+
+##compute the time of direct sampling 
+time_record_sample=system.time(
+for(ii in 1:1){
+  R0=abs(outer(x,(x),'-'))
+  Sigma=sigma_2*exp(-(R0/gamma)^{1}) ##suppose this is the covariance
+  L=t(chol(Sigma))
+  theta=rep(1,n)+L%*%rnorm(n)
+  theta
+  y=theta+sigma_2_0*rnorm(n) ##plus noise
+}
+)
+plot(y,pch=20,xlab='x',ylab='y')
+lines(theta,xlab='x',ylab='y')
+
+##1 log likelihood 
+##1.1 direct inverse 
+
+time_record_direct_inversion=system.time(
+for(ii in 1:1){
+tilde_Sigma=Sigma+sigma_2_0*diag(n)
+tilde_Sigma_inv=solve(tilde_Sigma)
+
+log_lik_direct_inversion=-n/2*log(2*pi)-determinant(tilde_Sigma)$modulus[1]/2-t(y)%*%tilde_Sigma_inv%*%y/2
+}
+)
+
+##you can use Cholesky to run it 
+
+##verify a few terms related to O-U
+R=Sigma/sigma_2
+R_inv=solve(R) ##this is tri-diagonal
+R_inv[1:5,1:5]
+rho=exp(-0.001/gamma)
+rho-R[1,2] ##verify this 
+-rho/(1-rho^2)-R_inv[1,2] ##verify this
+1/(1-rho^2)- R_inv[1,1] ##verify this
+-rho/(1-rho^2)-R_inv[1,2] ##verify this
+
+L_R=t(chol(R))
+L_R_inv=solve(L_R) ##this is lower tri-diagonal
+L_R_inv[1:5,1:5]
+-sqrt(rho^2/(1-rho^2))-L_R_inv[2,1]
+sqrt(1/(1-rho^2))-L_R_inv[2,2]
+
+###(t(L_R_inv)%*%(L_R_inv))-R_inv  ##this is zero
+
+tilde_Sigma_inv[1:5,1:5] ##note this is not sparse
+L_tilde=t(chol(tilde_Sigma))
+L_tilde_inv=solve(L_tilde)
+L_tilde[1:5,1:5]   ##note this is also not sparse
+
+##1.2 Kalman Filter for exponential kernel/O-U process
+
+m_KF=rep(NA,n) 
+a_KF=rep(NA,n) 
+f_KF=rep(NA,n) 
+C_KF=rep(NA,n) 
+R_KF=rep(NA,n) 
+Q_KF=rep(NA,n) 
+
+#marginal distribution for first one
+
+
+time_record_KF_in_R=system.time(
+for(ii in 1:1){
+  
+rho_KF=exp(-abs(x[2]-x[1])/gamma)  ##this is equally space
+a_KF[1]=0
+R_KF[1]=sigma_2
+f_KF[1]=a_KF[1]
+Q_KF[1]=R_KF[1]+sigma_2_0
+Q_KF_inv=1/Q_KF[[1]]    ##1d ##solve(Q_KF[1])
+m_KF[1]=a_KF[1]+R_KF[1]*Q_KF_inv*(y[1]-f_KF[1])
+C_KF[1]=R_KF[1]-R_KF[1]*Q_KF_inv*R_KF[1]
+
+
+
+for(i in 2:n){
+  a_KF[i]=rho_KF*m_KF[i-1]
+  R_KF[i]=rho_KF^2*C_KF[i-1]+(1-rho_KF^2)*R_KF[1]
+  
+  f_KF[i]=a_KF[i]
+  Q_KF[i]=R_KF[i]+sigma_2_0
+  
+  Q_KF_inv=1/(Q_KF[i])  ##solve
+  m_KF[i]=a_KF[i]+R_KF[i]*Q_KF_inv*(y[i]-f_KF[i])
+  C_KF[i]=R_KF[i]-R_KF[i]*Q_KF_inv*R_KF[i]
+  
+}
+
+lik_KF_in_R=0
+for(i in 1:n){
+  lik_KF_in_R=lik_KF_in_R+dnorm(y[i],mean=f_KF[i],sd= sqrt(Q_KF[i]),log=T)
+}
+}
+)
+
+##1.3 use my fastgasp package
+
+time_record_fastgasp=system.time(
+for(ii in 1:1){
+  
+    fgasp.model=fgasp(x, y,kernel_type='exp') ##only implement expo or matern_5_2 for this version
+
+  ###first term
+  log_det_S2=Get_log_det_S2( c(log(1/gamma),log(sigma_2_0/sigma_2)),fgasp.model@have_noise,fgasp.model@delta_x,
+                         fgasp.model@output,fgasp.model@kernel_type)
+  
+  log_lik_fastgasp=-n/2*log(2*pi*sigma_2)-log_det_S2[[1]]/2-log_det_S2[[2]]/(2*sigma_2)
+}
+)
+
+##likelihood values
+log_lik_direct_inversion
+lik_KF_in_R
+log_lik_fastgasp
+##time 
+time_record_direct_inversion
+time_record_KF_in_R
+time_record_fastgasp
+
+
+##2 predictive mean 
+
+##2.1 direct inverse 
+pred_mean_direct_inversion=Sigma%*%(tilde_Sigma_inv%*%y) ##after inversion, this is fast
+##2.2 from backward smoothing 
+s_KF=rep(NA,n) 
+S_KF=rep(NA,n) 
+s_KF[n]=m_KF[n]
+S_KF[n]=C_KF[n]
+
+for(i in (n-1):1){
+  R_inv_KF=1/R_KF[i+1]
+  s_KF[i]=m_KF[i]+C_KF[i]*rho_KF*R_inv_KF*(s_KF[i+1]-a_KF[i+1])
+  S_KF[i]=C_KF[i]-C_KF[i]*rho_KF*R_inv_KF*(R_KF[i+1]-S_KF[i+1])*R_inv_KF*rho_KF*C_KF[i]
+}
+
+
+
+##2.3 from fastgasp
+##you may get pred variance of data by var_data=TRUE or predictivee variance of the mean by var_data=F
+pred_mean_fastgasp=predict(param=c(log(1/gamma),log(sigma_2_0/sigma_2)),object=fgasp.model, testing_input=as.vector(x), var_data=F, sigma_2=sigma_2) 
+
+
+###check whether they are the same
+sqrt(mean( (s_KF-pred_mean_direct_inversion)^2))
+sqrt(mean( (pred_mean_fastgasp@mean-pred_mean_direct_inversion)^2))
+
+
+###check whether they 
+sqrt(mean( (pred_mean_direct_inversion-theta)^2 ))
+sqrt(mean( (pred_mean_fastgasp@mean-theta)^2))
+sqrt(mean( (s_KF-theta)^2))
+
+sqrt(mean( (y-theta)^2 ))
+
+plot(pred_mean_fastgasp@mean,xlab='x',ylab='y',
+     ylim=c(min(theta,pred_mean_fastgasp@mean),max(theta,pred_mean_fastgasp@mean)))
+lines(theta)
+
+
+
+###Other ways for sample
+###each sample has randomness so the sample won't be exactly the same as previous sample
+##KF 
+time_record_sample_DLM=system.time(
+for(i in 1:1){
+  theta_KF=rep(NA,n)
+  theta_KF[1]=sqrt(sigma_2)*rnorm(1)
+  for(i in 2:n){
+    theta_KF[i]=rho_KF*theta_KF[i-1]+sqrt((1-rho_KF^2)*sigma_2 )*rnorm(1)
+  }
+  
+  y_KF=theta_KF+sqrt(sigma_2_0)*rnorm(n)
+  
+  
+}
+)
+
+plot(y_KF,pch=20,xlab='x',ylab='y')
+lines(theta_KF,xlab='x',ylab='y')
+
+
+
+```
+
+## Week 7
+
+```{r}
+
+
+#install.packages("dlm")
+library(dlm)
+
+
+
+###dlm object through the dlm function########################################
+#1. random walk plus noise
+rw1 <- dlm(m0 = 0, C0 = 10, FF = 1, V = 1.4, GG = 1, W = 0.2)
+unlist(rw1)
+
+#one can also build this through 
+rw2 <- dlmModPoly(order = 1, dV = 1.4, dW = 0.2,m0=0,C0=10)
+unlist(rw2)
+
+#all dV dW, C0 all has default values, e.g. see
+?dlmModPoly
+
+rw3=dlmModPoly(order = 1)
+unlist(rw3)
+
+
+#2. linear growth model
+lg <- dlm(FF = matrix(c(1, 0), nr = 1),V=1.4,GG = matrix(c(1, 0, 1, 1), nr = 2),
+          W = diag(c(0.1, 0.2)),m0 = rep(0, 2),C0 = 10 * diag(2))
+lg
+unlist(lg)
+###one can change the values of dlm through following codes
+V(lg)<-0.8
+W(lg)[2,2]<-0.5
+V(lg)
+W(lg)
+
+##3. dynamic linear regression model  
+x <- rnorm(100) # covariates
+dlr <- dlm(FF = matrix(c(1, 0), nr = 1),
+           V = 1.3,
+           GG = diag(2),
+           W = diag(c(0.4, 0.2)),
+           m0 = rep(0, 2), C0 = 10 * diag(2), JFF = matrix(c(0, 1), nr = 1), X=x)
+dlr
+
+#see the time varying part
+dlr$X
+
+
+```
+
+
+```{r}
+#####Nile dataset in dlm######################################################
+
+##plot the data
+par(mfrow = c(1, 2))
+plot(Nile,type='b')
+acf(Nile)
+
+
+
+dev.off()
+##V = 15100 and W = 1468 are maximum likelihood estimates
+##if I use these number the following will be the in-sample fit not out of sample testing
+
+####random walk plus noise
+NilePoly <- dlmModPoly(order = 1, dV = 15000, dW = 1000)
+unlist(NilePoly)
+
+
+
+
+
+############Kalman Filter#####################################################
+NileFilt <- dlmFilter(Nile, NilePoly)
+#a little more comprehensive summary of the filtering results
+str(NileFilt, 1)
+
+n <- length(Nile)
+attach(NileFilt)
+
+####filtered variance
+##Var(theta_n|y_{1:n}} 
+dlmSvd2var(U.C[[n + 1]], D.C[n + 1, ])
+
+##Var(theta_t|y_{1:t}} 
+dlmSvd2var(U.C, D.C)
+
+filtered_var_record=rep(0, n+1)
+for(i in 1:(n+1)){
+  filtered_var_record[i]=dlmSvd2var(U.C[[i]], D.C[i, ])
+}
+
+##C_0
+filtered_var_record[1]
+##plot the rest
+plot(filtered_var_record[2:(n+1)],type='b')
+
+
+###try two model with different noise and plots
+plot(Nile, type='o', col = c("darkgrey"),  xlab = "", ylab = "Level")
+mod1 <- dlmModPoly(order = 1, dV = 15100, dW = 755)
+NileFilt1 <- dlmFilter(Nile, mod1)
+lines(dropFirst(NileFilt1$m), lty = "longdash")
+mod2 <- dlmModPoly(order = 1, dV = 15100, dW = 7550)
+NileFilt2 <- dlmFilter(Nile, mod2)
+lines(dropFirst(NileFilt2$m), lty = "dotdash")
+leg <- c("data", paste("filtered,  W/V =",
+                       format(c(W(mod1) / V(mod1),
+                                W(mod2) / V(mod2)))))
+legend("bottomright", legend = leg,
+      col=c("darkgrey", "black", "black"),
+      lty = c("solid", "longdash", "dotdash"),
+      pch = c(1, NA, NA), bty = "n")
+
+
+#######Backward smoothing#####################################################
+NileSmooth <- dlmSmooth(NileFilt)
+str(NileSmooth, 1)
+
+attach(NileSmooth)
+
+###these two should be the same, as they are both \theta_n| y_{1:n}
+drop(dlmSvd2var(U.S[[n + 1]], D.S[n + 1,]))
+drop(dlmSvd2var(U.C[[n + 1]], D.C[n + 1,]))
+
+##these two are different: the first one is Var(theta_t|y_{1:n}}
+##and the second is Var(theta_t|y_{1:t}} 
+drop(dlmSvd2var(U.S[[n / 2 + 1]], D.S[n / 2 + 1,]))
+drop(dlmSvd2var(U.C[[n / 2 + 1]], D.C[n / 2 + 1,]))
+
+smoothed_var_record=rep(0, n+1)
+for(i in 1:(n+1)){
+  smoothed_var_record[i]=dlmSvd2var(U.S[[i]], D.S[i, ])
+}
+
+##C_0
+smoothed_var_record[1]
+##plot the rest
+plot(smoothed_var_record[2:(n+1)],type='b')
+
+
+#####Smoothing with W=755 (small signal) and W=7550 (large signal)
+NileSmooth1 <- dlmSmooth(NileFilt1)
+NileSmooth2 <- dlmSmooth(NileFilt2)
+
+#########plot the filtering results
+par(mfrow=c(1,2))
+attach(NileSmooth1)
+hwid <- qnorm(0.025, lower = FALSE) *  sqrt(unlist(dlmSvd2var(U.S, D.S)))
+smooth <- cbind(s, as.vector(s) + hwid %o% c(-1, 1))
+
+plot(dropFirst(smooth), plot.type = "s", type = "l",
+     lty = c(1, 5, 5), ylab = "Level", xlab = "",
+     ylim = range(Nile))
+lines(Nile, type = "o", col = "darkgrey")
+legend("bottomleft", col = c("darkgrey", rep("black", 2)),
+       lty = c(1, 1, 5), pch = c(1, NA, NA), bty = "n",
+       legend = c("data", "smoothed level",
+                  "95% probability limits"))
+
+attach(NileSmooth2)
+hwid <- qnorm(0.025, lower = FALSE) * sqrt(unlist(dlmSvd2var(U.S, D.S))
+)
+smooth <- cbind(s, as.vector(s) + hwid %o% c(-1, 1))
+
+plot(dropFirst(smooth), plot.type = "s", type = "l",
+     lty = c(1, 5, 5), ylab = "Level", xlab = "",
+     ylim = range(Nile))
+lines(Nile, type = "o", col = "darkgrey")
+legend("bottomleft", col = c("darkgrey", rep("black", 2)),
+       lty = c(1, 1, 5), pch = c(1, NA, NA), bty = "n",
+       legend = c("data", "smoothed level",
+                  "95% probability limits"))
+
+
+
+##note that the above coverage is only for the covariance for the mean not the data
+##the following coverage is for the data
+par(mfrow=c(1,2))
+attach(NileSmooth1)
+hwid <- qnorm(0.025, lower = FALSE) *  sqrt(unlist(dlmSvd2var(U.S, D.S))+mod1$V)
+smooth <- cbind(s, as.vector(s) + hwid %o% c(-1, 1))
+
+plot(dropFirst(smooth), plot.type = "s", type = "l",
+     lty = c(1, 5, 5), ylab = "Level", xlab = "",
+     ylim = range(Nile,smooth))
+lines(Nile, type = "o", col = "darkgrey")
+legend("bottomleft", col = c("darkgrey", rep("black", 2)),
+       lty = c(1, 1, 5), pch = c(1, NA, NA), bty = "n",
+       legend = c("data", "smoothed level",
+                  "95% probability limits"))
+
+attach(NileSmooth2)
+hwid <- qnorm(0.025, lower = FALSE) * sqrt(unlist(dlmSvd2var(U.S, D.S))+mod2$V)
+
+smooth <- cbind(s, as.vector(s) + hwid %o% c(-1, 1))
+
+plot(dropFirst(smooth), plot.type = "s", type = "l",
+     lty = c(1, 5, 5), ylab = "Level", xlab = "",
+     ylim = range(Nile,smooth))
+lines(Nile, type = "o", col = "darkgrey")
+legend("bottomleft", col = c("darkgrey", rep("black", 2)),
+       lty = c(1, 1, 5), pch = c(1, NA, NA), bty = "n",
+       legend = c("data", "smoothed level",
+                  "95% probability limits"))
+dev.off()
+
+
+#######################One step Forecast######################################
+a <- window(cbind(Nile, NileFilt1$f, NileFilt2$f),
+            start = 1880, end = 1920)
+plot(a[, 1], type = 'o', col = "darkgrey",
+     xlab = "", ylab = "Level")
+lines(a[, 2], lty = "longdash")
+lines(a[, 3], lty = "dotdash")
+leg <- c("data", paste("one-step-ahead forecast,  W/V =",
+                       format(c(W(mod1) / V(mod1),W(mod2) / V(mod2)))))
+legend("bottomleft", legend = leg, col = c("darkgrey", "black", "black"),
+       lty = c("solid", "longdash", "dotdash"),
+       pch = c(1, NA, NA), bty = "n")
+
+
+######the first is zero because it is the prior mean
+NileFilt1$f
+NileFilt2$f
+####MSE, we only calculate after 10 data
+mean((Nile[11:100]-NileFilt1$f[11:100])^2)
+mean((Nile[11:100]-NileFilt2$f[11:100])^2)
+
+####normalized RMSE
+mean_Nile=rep(1000,100)
+for(i in 2:100){
+  mean_Nile[i]=mean(Nile[1:(i-1)])
+  
+}
+sqrt(  mean((Nile[11:100]-NileFilt1$f[11:100])^2)/mean( (Nile[11:100]-mean_Nile[11:100])^2)    )
+sqrt(  mean((Nile[11:100]-NileFilt2$f[11:100])^2)/mean( (Nile[11:100]-mean_Nile[11:100])^2)    )
+
+
+################Seasonal Model#################################################
+
+
+#####I don't know much about the parameters here
+UKgas.dlm <- dlm(m0 = rep(0,4), C0 = 1e8 * diag(4),
+                FF = matrix(c(1, 1, 0, 0), nr = 1),
+                V = 1,
+                GG = bdiag(matrix(1),
+                           matrix(c(-1, -1, -1, 1, 0, 0, 0, 1, 0),
+                                  nr = 3, byrow = TRUE)),
+                W = diag(c(10000, 100, 0, 0), nr = 4))
+
+plot(UKgas, xlab = "", ylab = "UKgas", type = 'o',  col = "darkgrey")
+
+UKgasFilt <- dlmFilter(UKgas, UKgas.dlm)
+
+lines(dropFirst(UKgasFilt$m[, 1]), lty = "dotdash") 
+ ### Smoothing
+UKgasSmooth <- dlmSmooth(UKgasFilt)
+lines(dropFirst(UKgasSmooth$s[,1]), lty = "longdash")
+ legend("bottomright", col = c("darkgrey", rep("black", 2)), lty = c("solid", "dotdash", "longdash"),
+         pch = c(1, NA, NA), bty = "n",
+         legend = c("data", "filtered level", "smoothed level"))
+
+
+
+### Seasonal component
+  plot(dropFirst(UKgasSmooth$s[, 3]), type = 'o', xlab = "",
+       ylab = "UKGas - Seasonal component")
+abline(h = 0)
+
+#############################################################################
+
+
+
+```
+
+## Week 8
+
+```{r}
+library(FastGaSP)
+
+y_R<-function(x){
+  sin(2*pi*x)
+}
+###let's test for 2000 observations
+set.seed(1)
+num_obs=2000
+input=runif(num_obs)
+output=y_R(input)+rnorm(num_obs,mean=0,sd=0.1)
+
+##constucting the fgasp.model
+fgasp.model=fgasp(input, output)
+
+##range and noise-variance ratio (nugget) parameters
+param=c( log(1),log(.02))
+
+## the log lik
+log_lik(param,fgasp.model)
+
+##time cost to compute the likelihood
+
+time_cost=system.time(log_lik(param,fgasp.model))
+time_cost[1]
+
+##consider a nonparametric regression setting
+
+##estimate the parameter by maximum likelihood estimation
+est_all<-optim(c(log(1),log(.02)),log_lik,object=fgasp.model,method="L-BFGS-B",
+               control = list(fnscale=-1))
+
+##estimated log inverse range parameter and log nugget
+est_all$par
+
+##estimate variance
+est.var=Get_log_det_S2(est_all$par,fgasp.model@have_noise,fgasp.model@delta_x,
+                       fgasp.model@output,fgasp.model@kernel_type)[[2]]/fgasp.model@num_obs
+est.var
+
+
+###1. Do some interpolation test
+num_test=5000
+testing_input=runif(num_test) ##there are the input where you don't have observations
+pred.model=predict(param=est_all$par,object=fgasp.model,testing_input=testing_input)
+lb=pred.model@mean+qnorm(0.025)*sqrt(pred.model@var)
+ub=pred.model@mean+qnorm(0.975)*sqrt(pred.model@var)
+
+
+## calculate lb for the mean function
+pred.model2=predict(param=est_all$par,object=fgasp.model,testing_input=testing_input,var_data=FALSE)
+lb_mean_funct=pred.model2@mean+qnorm(0.025)*sqrt(pred.model2@var)
+ub_mean_funct=pred.model2@mean+qnorm(0.975)*sqrt(pred.model2@var)
+
+
+## plot the prediction
+min_val=min(lb,output)
+max_val=max(ub,output)
+plot(pred.model@testing_input,pred.model@mean,type='l',col='blue',
+     ylim=c(min_val,max_val),
+     xlab='x',ylab='y')
+polygon(c(pred.model@testing_input,rev(pred.model@testing_input)),
+        c(lb,rev(ub)),col = "grey80", border = FALSE)
+lines(pred.model@testing_input,pred.model@mean,type='l',col='blue')
+lines(pred.model@testing_input,y_R(pred.model@testing_input),type='l',col='black')
+lines(pred.model2@testing_input,lb_mean_funct,col='blue',lty=2)
+lines(pred.model2@testing_input,ub_mean_funct,col='blue',lty=2)
+lines(input,output,type='p',pch=16,col='black',cex=0.4) #one can plot data
+legend("bottomleft", legend=c("predictive mean","95% predictive interval","truth"),
+       col=c("blue","blue","black"), lty=c(1,2,1), cex=.8)
+
+testing_truth=y_R(sort(testing_input))
+sqrt(mean( (pred.model@mean-testing_truth)^2))
+sd(testing_truth)
+
+sum(ub_mean_funct>testing_truth & lb_mean_funct<testing_truth)/num_test
+mean(ub_mean_funct-lb_mean_funct) ##average 95% interval for truth 
+
+
+
+#--------------------------------------------------------------
+# Example 2: example that one does not have a noise in the data
+#--------------------------------------------------------------
+
+## Here is a function in the Sobolev Space with order 3
+y_R<-function(x){
+  j_seq=seq(1,200,1)
+  record_y_R=0
+  for(i_j in 1:200){
+    record_y_R=record_y_R+2*j_seq[i_j]^{-2*3}*sin(j_seq[i_j])*cos(pi*(j_seq[i_j]-0.5)*x)
+  }
+  record_y_R
+}
+##generate some data without noise
+num_obs=50
+input=seq(0,1,1/(num_obs-1))
+output=y_R(input)
+
+##constucting the fgasp.model
+fgasp.model=fgasp(input, output,have_noise=FALSE)
+
+
+##range and noise-variance ratio (nugget) parameters
+param=c( log(1))
+
+## the log lik
+log_lik(param,fgasp.model)
+
+#if one does not have noise one may need to give a lower bound or use a penalty
+#(e.g. induced by a prior) to make the estimation more robust
+
+est_all<-optimize(log_lik,interval=c(0,10),maximum=TRUE,fgasp.model)
+
+
+##Do some interpolation test for comparison
+num_test=1000
+testing_input=runif(num_test) ##there are the input where you don't have observations
+pred.model=predict(param=est_all$maximum,object=fgasp.model,testing_input=testing_input)
+
+
+#This is the 95 posterior credible interval for the outcomes which contain the estimated
+#variance of the noise
+#sometimes there are numerical instability is one does not have noise or error
+lb=pred.model@mean+qnorm(0.025)*sqrt(abs(pred.model@var))
+ub=pred.model@mean+qnorm(0.975)*sqrt(abs(pred.model@var))
+
+
+## plot the prediction
+min_val=min(lb,output)
+max_val=max(ub,output)
+plot(pred.model@testing_input,pred.model@mean,type='l',col='blue',
+     ylim=c(min_val,max_val),
+     xlab='x',ylab='y')
+polygon( c(pred.model@testing_input,rev(pred.model@testing_input)),
+         c(lb,rev(ub)),col = "grey80", border = FALSE)
+lines(pred.model@testing_input,pred.model@mean,type='l',col='blue')
+
+
+lines(pred.model@testing_input,y_R(pred.model@testing_input),type='l',col='black')
+lines(input,output,type='p',pch=16,col='black')
+legend("bottomleft", legend=c("predictive mean","95% predictive interval","truth"),
+       col=c("blue","blue","black"), lty=c(1,2,1), cex=.8)
+##mean square error for all inputs
+mean((pred.model@mean- y_R(pred.model@testing_input))^2)
+
+
+```
+

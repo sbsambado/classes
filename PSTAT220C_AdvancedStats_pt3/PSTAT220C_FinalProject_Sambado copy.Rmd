@@ -1,0 +1,984 @@
+---
+title: "PSTAT 220C Final Project"
+author: "Samantha Sambado"
+date: "5/26/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+
+#   bibliography: PSTAT220C_FinalProject_Bibliography.bib
+ # link-citations: yes
+  
+# needed packages
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(reshape2)
+library(MASS)
+library(lme4)
+library(kableExtra)
+library(psych)
+library(effects)
+library(jtools)
+library(forcats)
+library(float)
+library(scales)
+library(ggbreak)
+library(ggpubr)
+library(lubridate)
+library(viridis)
+
+
+# read in all the data
+
+dragged_IxodesDerm_Climate_aggregate <- read.csv("final_project/dragged_IxodesDerm_Climate_aggregate.csv")
+
+
+dragged_Derm_Climate_aggregate <- read.csv("final_project/dragged_Derm_Climate_aggregate.csv")
+
+dragged_Ixodes_Climate_aggregate <- read.csv("final_project/dragged_Ixodes_Climate_aggregate.csv")
+
+
+lizard_long_Climate <- read.csv("final_project/liz_long_Climate.csv")
+
+prism_full_long <- read.csv("final_project/PRISM_FULL_reserves.csv")
+```
+
+
+
+
+## Title: Within season dynamics of tick behavior and tick counts as a response to heterogeneous climate across California
+
+## Abstract
+
+Climate change is having direct and indirect effects on vector-borne disease transmission. Ectotherm vectors, such as ticks, are particularly sensitive to changes in temperature, humidity, and seasonal cues. The risk of Lyme disease across the United States is highly variable, especially when comparing the east vs west coast systems. A major driver of differences in Lyme disease risk is host-seeking tick behavior (ie tick phenology) within a given system. Yet tick phenology patterns cannot be summed as binary outcomes (eg synchronous or asynchronous) and display a high heterogeneity due to the varying climates ticks, specifically Ixodes spp, are present across the United States. Our study tries to improve on previous problems of sampling phenology data with within season dynamics and sampling methods to accurately assess juvenile tick populations and define transmission cycles which will ultimately improve tick-borne disease predictions.  We collected tick life stage and seasonality data from 33 plots across 11 sites that were sampled five times within one juvenile tick season spanning a 450+ mi range in the heterogeneous landscape of California. We incorporated remotely sensed climate data to explore variations of tick-host interactions across a latitudinal and coastal gradient to hypothesize potential mechanisms and predictors for pathogen diversity and variation in tick-borne disease incidence. We find that the effects of individual climate parameters vary depending on the genus of tick (Ixodes or Dermacentor spp.) as well as tick life stage (adult or juvenile).
+
+## Introduction
+
+Climate change is altering the risk of vector-borne diseases on local and global scales (**Kilpatrick 2017**). Climatic variables such as temperature, humidity, and precipitation directly impact vector behavior which alters interactions between vectors and humans (**Ogden 2017**). Indirectly, vector behavior — specifically host-seeking phenology — influences how pathogens are maintained in their enzootic cycles (**Kurtenbach 2006, Hamer 2012**). Tick-borne diseases are the most common vector-borne diseases in North America and over 40,000 cases were reported reported in 2019 (**Swei 2019**). Tick-borne pathogens have complex transmission dynamics that require the tick, host and pathogen to align in space and time (**Levi 2018**). The duration and intensity of tick-host-pathogen interactions determine tick-borne pathogen prevalence and human disease risk and are dependent on many interacting factors such as temperature, vegetation, and host community structure (**MacDonald 2019, 2020**). To accurately project disease risk across large spatiotemporal scales, detailed empirical studies incorporating such factors are needed to inform theory to make testable predictions.
+ 
+Tick-borne disease risk, specifically for Lyme disease, is highly variable throughout the United States (US) and has been hypothesized to be driven by tick behavior (ie tick phenology), yet directly measuring the impact of tick phenology on disease incidence has rarely been tested. The tick vector of Lyme disease has three post-egg life stages (larva, nymph, adult) that take a blood meal from a vertebrate host at each stage prior to molting into the subsequent life stage over their 2-3 year life cycle (**Fig. 1**) (*Ostfeld & Buskirk 1995, Padgett 2014**). **Tick phenology — defined as the timing of peak larval and nymphal abundance phenology — is an important factor for pathogen maintenance and disease risk.** For example in the eastern United States (US), infected nymphal ticks emerge to feed and infect rodent hosts that are then subsequently fed on by naïve larvae which become infected nymphs the following year. In contrast in the far western US, peak larval abundances occur slightly before peak nymphal abundance which reduces the amount of infectious contacts between vectors and hosts. This unique seasonality of *Ixodes pacificus* in California is hypothesized as one of the reasons Lyme disease risk is lower than in the eastern US. A horizontally transmitted pathogen — like the causative agent of Lyme disease, *Borrelia burgdorferi* — will have fewer opportunities to be transmitted from an infected nymph to naïve larvae via a vertebrate host. However, for a vertically transmitted pathogen like *Borrelia miyamotoi* or a pathogen that benefits from juvenile synchrony like *Anaplasma phagocytophilum*, this California phenology may increase transmission because vertically infected larvae may infect hosts before nymphs or  naïve larvae may interact with infected nymphs on a single host (**Sambado 2020**).
+
+![Life cycle of I. pacificus ticks](final_project/lifecycle.png)
+
+The seasonal activity patterns of *I. pacificus* can vary within and across regions in California which may affect the efficiency of transmission cycles of pathogens transmitted by this species (**MacDonald 2016**). Seasonal weather patterns such as warm springs and mild winters have been shown to lengthen the tick-host seeking season, which provide more opportunities for ticks to feed successfully (**Hamer 2012**). In contrast, hot summers have been shown to truncate the tick host-seeking season (**MacDonald 2016**). These seasonal effects along with  climate change may impact the magnitude of overlap, or temporal gap, between nymphal and larval ticks and in turn influences pathogen maintenance.
+ 
+Measurements of tick phenology and risk of tick-borne diseases are often collected, once or twice a year over multiple years, which is appropriate for long term trends but neglects stochastic variation (i.e. drought, fire, etc.) within a given year. Within season dynamics — particularly the phenology of larval and nymphal ticks — are important for understanding disease transmission for the following year. However, accurately sampling for larvae and nymphs across large spatial scales has been a challenge, especially for more southern regions on the eastern and western coast of the US (**Lane 2006**). It has been hypothesized that the lack of sampling for juvenile ticks (i.e. larvae and nymphs) with standard dragging methods — despite a robust local adult population — may be due to behavioral differences as a response to hotter climates, such as less time spent seeking hosts to avoid dessication. In California, there is the additional challenge that the preferential host for juvenile ticks are reptiles — particularly the western fence lizard (*Scoloperous occidentalis*) — which is not commonly surveyed in North American tick systems (**Swei 2012**). 
+
+
+## Research goals
+
+This study tries to address both issues — within season dynamics and sampling methods — to accurately assess juvenile tick populations and define transmission cycles which will ultimately improve tick-borne disease predictions.  We collected tick life stage and seasonality data from 33 plots across 11 sites that were sampled five times within one juvenile tick season spanning a 450+ mi range in the heterogeneous landscape of California (**Fig. 2**). We incorporated remotely sensed climate data to explore variations of tick-host interactions across a latitudinal and coastal gradient to find potential mechanisms and predictors for pathogen diversity and variation in tick-borne disease incidence. 
+
+![The study system in California. Each dot represents an individual reserve and the color of the dot represents what I'm classifying as central or inland reserve for my analyses](final_project/reserve.png){width=40%, height=40%}
+
+
+
+
+## Statistical model & data set
+
+
+### Data set
+
+For this research the data comes from field sampling across the UCNRS, microscopic work in the lab at UCSB, and extraction of remote sensed climate data from PRISM. 
+
+**Field methods**
+
+Eleven reserves in the UCNRS system (**Fig. 2**) were consecutively sampled once per month between January through June of 2021 (11 reserves in 12 days each month). At each reserve, three plots in oak woodlands or chaparral were repeatedly sampled (Appendix). Standard tick dragging was conducted for ~ 550 m at each plot using a 1 m2 white flannel cloth. The drag cloth was checked every 8 - 10 m. All visible ticks were put in a 70% ethanol vial with tweezers and stored at room temperature until identification in the lab. Ticks collected by this method are labeled as ‘drag cloth ticks’.
+
+```{r, include=FALSE}
+
+### DRAG
+
+## IXODES
+
+# read in data
+dragged_Ixodes_aggregate <- read.csv("final_project/dragged_Ixodes_Climate_aggregate.csv")
+
+# convert to tick counts per 100 m
+dragged_Ixodes_aggregate$per100 <- dragged_Ixodes_aggregate
+
+#
+dragged_Ixodes_aggregate$life_stage_guess <- dragged_Ixodes_aggregate$life_stage
+
+dragged_Ixodes_aggregate$life_stage_guess[dragged_Ixodes_aggregate$life_stage_guess == "ID"] <- "N"
+
+dragged_Ixodes_aggregate$life_stage_guess <- factor(dragged_Ixodes_aggregate$life_stage_guess,
+                      levels = c("L", "N", "A"))
+
+
+# relevel factors
+dragged_Ixodes_aggregate$reserve <- factor(dragged_Ixodes_aggregate$reserve,
+                      levels = c("McLaughlin", "Quail Ridge", "Point Reyes",
+                                 "Fort Ord", "Hastings", 
+                                 "Big Creek", "Rancho Marino",
+                                 "Sedgwick", "Coal Oil Point",
+                                 "Stunt Ranch", "Santa Cruz Island"))
+
+
+drag_ixodes <- 
+  
+  ggplot(dragged_Ixodes_aggregate, aes(x = reserve, y = tick_tot, fill = life_stage_guess)) +
+  geom_bar(position = "stack", stat = "identity") + # position = "fill" gives props
+  labs(y = "Tick Counts",x =  "Reserve") +
+  scale_fill_manual(values = c("#1B9E77", "#D95F02","goldenrod"),#"goldenrod","mediumorchid","coral"
+                    name = "Lifestage",labels = c("L","N","A"))+
+  #scale_fill_viridis(discrete = TRUE) +
+  scale_x_discrete(limits = rev(levels(dragged_Ixodes_aggregate$reserve)),
+                   labels = c("McLaughlin" = "ML",
+                              "Quail Ridge" = "QR",
+                              "Point Reyes" = "PR",
+                              "Fort Ord" = "FO",
+                              "Hastings" = "HT",
+                              "Big Creek" = "BC",
+                              "Rancho Marino" = "RM",
+                              "Coal Oil Point" = "CO",
+                              "Sedgwick" = "SD",
+                              "Santa Cruz Island" = "SC",
+                              "Stunt Ranch" = "SR")) +
+  coord_flip() +
+  theme_bw() +
+  #ylab(expression("Ixodes Tick Density/100m"^{2})) +
+    theme(title = element_text(face = "bold", size = 14),
+          axis.title.y =  element_blank(), 
+          legend.position = c(1.3,.6),
+          legend.text = element_text(size = 12),
+          legend.title = element_text(size = 14),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 16),
+          axis.title.x = element_text(face = "bold")) +
+  scale_y_continuous(breaks  = c(75, 150, 225, 300)) +
+  scale_y_break(c(150,220)) +
+  guides(fill = FALSE) 
+#ggsave(drag_ixodes, filename = "manuscript_figs/fig2_drag_ixodes.jpeg")
+
+
+
+
+## DERMACENTOR
+
+# read in data
+dragged_Derm_aggregate <- read.csv("final_project/dragged_Derm_Climate_aggregate.csv")
+                                   
+
+
+# convert to tick counts per 100 m
+#dragged_Derm_aggregate$per100 <- dragged_Derm_aggregate$tick_tot*5
+
+# relevel factors
+dragged_Derm_aggregate$reserve <- factor(dragged_Derm_aggregate$reserve,
+                      levels = c("McLaughlin", "Quail Ridge", "Point Reyes",
+                                 "Fort Ord", "Hastings", 
+                                 "Big Creek", "Rancho Marino",
+                                 "Sedgwick", "Coal Oil Point",
+                                 "Stunt Ranch", "Santa Cruz Island"))
+
+
+
+dragged_Derm_aggregate$life_stage_guess <- dragged_Derm_aggregate$life_stage
+
+dragged_Derm_aggregate$life_stage_guess[dragged_Derm_aggregate$life_stage_guess == "ID"] <- "N"
+
+dragged_Derm_aggregate$life_stage_guess <- factor(dragged_Derm_aggregate$life_stage_guess,
+                      levels = c("L", "N", "A"))
+
+
+drag_derm <- 
+  
+  ggplot(dragged_Derm_aggregate, aes(x = reserve, y = tick_tot, fill = life_stage_guess)) +
+    geom_bar(position = "stack", stat = "identity") + # position = "fill" gives props
+  #geom_bar(position = "dodge", stat = "identity") + # position = "fill" gives props
+  labs(y = "Tick Counts",x =  "Reserve") +
+  scale_fill_manual(values = c("#1B9E77", "#D95F02","goldenrod"),#"goldenrod","mediumorchid","coral"
+                    name = "Lifestage",labels = c("L","N","A"))+
+  #scale_fill_viridis(discrete = TRUE) +
+  scale_x_discrete(limits = rev(levels(dragged_Derm_aggregate$reserve)),
+                   labels = c("McLaughlin" = "ML",
+                              "Quail Ridge" = "QR",
+                              "Point Reyes" = "PR",
+                              "Fort Ord" = "FO",
+                              "Hastings" = "HT",
+                              "Big Creek" = "BC",
+                              "Rancho Marino" = "RM",
+                              "Coal Oil Point" = "CO",
+                              "Sedgwick" = "SD",
+                              "Santa Cruz Island" = "SC",
+                              "Stunt Ranch" = "SR")) +
+  coord_flip() +
+  theme_bw() +
+  #ylab(expression("Dermacentor Tick Density/100m"^{2})) +
+    theme(title = element_text(face = "bold", size = 14),
+          axis.title.y =  element_blank(), 
+          legend.position = "bottom",
+          legend.text = element_text(size = 12),
+          legend.title = element_text(size = 14),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 16),
+          axis.title.x = element_text(face = "bold")) +
+  scale_y_continuous(breaks  = c(75, 150, 225, 300, 375, 400))
+  #guides(fill = FALSE) 
+#ggsave(drag_derm, filename = "manuscript_figs/fig2_drag_derm.jpeg")
+
+
+
+```
+
+ 
+Lizard burdens, specifically *S. occidentalis*,  were assessed at eleven reserves during the months of March to June. Lizard surveying would begin after 11 AM at each plot. Lizards were caught using a 2 foot fishing pole with a dental floss lasso at the tip (**Swei 2012**). Twenty minutes would be dedicated to looking for lizards at each plot. When a lizard was caught, the timer would be stopped and would resume once the lizard was released. Tick burdens were assessed on the ears and pouches. White out paint was applied to the back of the lizard to ensure an individual lizard was not sampled twice per month. If no lizards were seen on the plot after 20 minutes, lizard surveying would occur off the plot near habitat that was more suitable for lizards (i.e. fallen logs, exposed rocks, near cover boards) for another 10 minutes.  Ticks collected by this method are labeled as ‘lizard attached ticks’.
+
+
+```{r , include=FALSE}
+
+## LIZARD
+
+
+lizard_aggregate <- read.csv("final_project/liz_long_Climate.csv")
+                             
+# relevel factors
+lizard_aggregate$reserve <- factor(lizard_aggregate$reserve,
+                      levels = c("McLaughlin", "Quail Ridge", "Point Reyes",
+                                 "Fort Ord", "Hastings", 
+                                 "Big Creek", "Rancho Marino",
+                                 "Sedgwick", "Coal Oil Point",
+                                 "Stunt Ranch", "Santa Cruz Island"))
+
+
+
+liz_counts <- 
+  ggplot(lizard_aggregate, aes(x = reserve, y = count, fill = life_stage)) +
+  geom_bar(position = "stack", stat = "identity") + # position = "fill" gives props
+  labs(y = "Cumulative Lizard Tick Burden",x =  "Reserve") + 
+  scale_fill_manual(values = c("#1B9E77", "#D95F02","goldenrod"),#"goldenrod","mediumorchid","coral"
+                    name = "Lifestage",labels = c("Larva","Nymph","Adult"))+
+  scale_x_discrete(limits = rev(levels(dragged_Derm_aggregate$reserve)),
+                   labels = c("McLaughlin" = "ML",
+                              "Quail Ridge" = "QR",
+                              "Point Reyes" = "PR",
+                              "Fort Ord" = "FO",
+                              "Hastings" = "HT",
+                              "Big Creek" = "BC",
+                              "Rancho Marino" = "RM",
+                              "Coal Oil Point" = "CO",
+                              "Sedgwick" = "SD",
+                              "Santa Cruz Island" = "SC",
+                              "Stunt Ranch" = "SR")) +
+  coord_flip() +
+  theme_bw() +
+    theme(title = element_text(face = "bold", size = 14),
+          axis.title.y =  element_blank(), 
+          legend.position = "bottom",
+          legend.text = element_text(size = 12),
+          legend.title = element_text(size = 14),
+          axis.text.x = element_text(size = 10),
+          axis.text.y = element_text(size = 16),
+          axis.title.x = element_text(face = "bold")) #+ #face = "bold", 
+  #scale_y_continuous(breaks  = c(75, 150, 225, 300, 375, 525)) +
+    #scale_y_break(c(300,450)) +
+ # guides(fill = FALSE)
+#ggsave(liz_counts, filename = "manuscript_figs/fig2_liz_burden.jpeg")
+
+```
+
+
+```{r fig.cap= "Variation exists by reserve and tick lifestage; however sampling method may skew trends in tick counts"}
+library(patchwork)
+library(ggpubr)
+#(drag_ixodes + drag_derm) /  liz_counts + plot_layout(heights = c(2,2,1))
+
+
+drag <- ggarrange(drag_ixodes, drag_derm, common.legend = TRUE, legend = "bottom")
+
+drag
+```
+
+```{r fig.cap= "Lizard sampling is the better method to sample Ixodes spp. juvenile ticks (larvae and nymphs)"}
+
+liz_counts
+
+```
+
+
+**Remotely sensed climate data**
+
+Climate data for each site was used from the Oregon State Parameter-elevation Regression on Independent Slopes Model (**PRISM**) Climate Group which provide estimates of primary climate elements such as mean temperature (**tmean, °C**), precipitation (**ppt,  mm**) that was aggregated into precipitation per month (**ppt_month, mm**), and maximum vapor pressure deficit (**vpdmax, kPA**) (**Fig. 5**) . Data from December through July of  2021 was selected to match sampling periods and account for any lags in climate data (e.g. December climate data for January tick sampling). Climate data from Tmean is derived as the average of max temperature and minimum temperature that is average over all days in the month. Ppt is the monthly total precipitation. Vpdmax is the daily maximum vapor pressure deficit averaged over all days in the month. Vapor pressure deficit (vpd) is the actual difference (in units of pressure) between Actual Vapor Pressure and the Saturation Vapor Pressure (e.g. the amount of moisture in the air and how much moisture in the air can hold when it’s saturated). Max vpd has been shown to be a significant predictor of tick counts and questing activity, which is why it is incorporated in this analyses. Single  point climates estimates taken at a 4 km resolution come from given GPS plots of site locations (Appendix).
+
+
+
+```{r, include = FALSE}
+prism_full_long <- read.csv("final_project/PRISM_FULL_reserves.csv")
+                            
+                            
+
+# relevel factors
+prism_full_long$reserve <- factor(prism_full_long$reserve,
+                      levels = c("McLaughlin", "Quail Ridge", "Point Reyes",
+                                 "Fort Ord", "Hastings", 
+                                 "Big Creek", "Rancho Marino",
+                                 "Sedgwick", "Coal Oil Point",
+                                 "Stunt Ranch", "Santa Cruz Island"),
+                      labels = c("McLaughlin" = "ML",
+                              "Quail Ridge" = "QR",
+                              "Point Reyes" = "PR",
+                              "Fort Ord" = "FO",
+                              "Hastings" = "HT",
+                              "Big Creek" = "BC",
+                              "Rancho Marino" = "RM",
+                              "Coal Oil Point" = "CO",
+                              "Sedgwick" = "SD",
+                              "Santa Cruz Island" = "SC",
+                              "Stunt Ranch" = "SR"))
+
+
+prism_full_long$date <- ymd(prism_full_long$date)  
+prism_full_long$julian <- format(prism_full_long$date, "%j")
+prism_full_long$julian <- as.numeric(prism_full_long$julian)
+  
+  tmax_fig <- prism_full_long %>%
+    filter(data_type == "tmax") %>%
+    ggplot(aes(x = date, y = data, color = reserve)) +
+  geom_point(alpha = .1) +
+  geom_line(alpha = .5) +
+  scale_fill_viridis(discrete = TRUE, option = "D") +
+  theme_classic()+
+  labs(x = "Month", y = "Max Temperature (C)", color = "Reserve") +
+  theme(legend.position = "bottom",
+        legend.title = element_text(face = 'bold'),
+        axis.title = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(size = 12)) +
+    guides(color = FALSE) +
+    geom_hline(yintercept = 27, color = "black", size = 1, linetype = "dashed") #80 C
+  
+vpdmax_fig <- prism_full_long %>%
+    filter(data_type == "vpdmax") %>%
+    ggplot(aes(x = date, y = data, color = reserve)) +
+    geom_point(alpha = .1) +
+    geom_line(alpha = .5) +
+    scale_fill_viridis(discrete = TRUE, option = "D")  +
+    theme_classic()+
+    labs(x = "Month", y = "Max VPD (kPA)", color = "Reserve") +
+    theme(legend.position = "bottom",
+          legend.title = element_text(face = 'bold'),
+          axis.title = element_text(face = "bold", size = 14),
+          axis.text.x = element_text(size = 12)) +
+    guides(color = FALSE) +
+    geom_hline(yintercept = 20, color = "black", size = 1, linetype = "dashed")
+
+
+ppt_fig <-  prism_full_long %>%
+    filter(data_type == "ppt" & data < 63.5) %>%
+    ggplot(aes(x = date, y = data, color = reserve)) +
+    geom_point(alpha = .1) +
+    geom_line(alpha = .5) +
+    scale_fill_viridis(discrete = TRUE, option = "D")  +
+      theme_classic()+
+    labs(x = "Month", y = "Precipitation (mm)", color = "Reserve") +
+    theme(legend.position = "bottom",
+          legend.title = element_text(face = 'bold'),
+          axis.title = element_text(face = "bold", size = 14),
+          axis.text.x = element_text(size = 12)) +
+    #guides(color = FALSE) +
+    geom_hline(yintercept = 25, color = "black", size = 1, linetype = "dashed")  # 1 inches, removed < 63.5 mm which is 2.5 inches
+
+```
+
+
+```{r, fig.cap = "Subset of climate data from each reserve between December and July of 2021. Dotted lines represent upper limit of tick physiological preferences."}
+
+# final figure
+ggarrange(tmax_fig, vpdmax_fig, ppt_fig, common.legend = TRUE, legend = "bottom", ncol = 3)
+
+#fig3_climate_subset <- tmax_fig / vpdmax_fig / ppt_fig + plot_layout(ncol = 3)
+#ggsave(fig3_climate_subset, filename = "manuscript_figs/fig3_climate_subset.jpeg")
+
+```
+
+
+```{r , include=FALSE}
+## Summary statistics
+full_data <- read.csv("final_project/dragged_climate_IxodesDerm.csv")
+
+
+full_data %>%
+  count() #2149	
+
+
+full_data  %>%
+  group_by(genus) %>%
+  count() # derm 1254	, ixoes 895
+
+
+
+sum(lizard_long_Climate$count)
+```
+
+
+
+## Numerical analysis
+
+**Association between climate and abundances of tick species and life stages** 
+
+We wanted to know if certain climatic conditions influenced tick abundances within a given season to capture phenology patterns to later extrapolate with pathogen trends. Tick abundances (ie aggregated counts per reserve per month) were the outcome of interest with input climate variables max/mean/min temperature (C), vdp max/min (kPA), and precipitation aggregated for that particular month (mm). Daily precipitation was also evaluated but proved unmeaningful, especially when field sampling only occurred when the ground was dry. We assessed the relation between tick counts and climate variables by running a series of separate multiple regression models (Appendix) for  (1) type of sampling method (ie drag cloth or lizard burden) and within those sampling method groups we ran models for (a) all ticks collected, (b) Ixodes spp ticks, (c) Dermacentor spp. ticks. For drag cloth sampling models and each genera of ticks we evaluated abundance trends for juvenile (ie larvae and nymphs; lumped due to small sample size) and adult ticks. For lizard burden models and each genera of ticks we evaluated abundance trends of  larvae and nymphs separately. Multiple model types (ie negative binomial, quasi-poisson, poisson) were attempted to deal with overdispersion of tick abundances - which is typical for tick counts - however the best fit model for all model attempts (Appendix) was a poisson generalized linear model based on likelihood ratio and dispersion parameter closest to 1. Selecting for individual nested models within each group was based on AIC and rules of parsimony. 
+
+**Model type**
+
+The outcome of interest, `tick` counts, did not meet the assumption of a Gaussian distribution so a generalized linear model (GLM) was chosen for the analysis. The GLM has three components: random component (exponential family), systematic component (linear predictor: $\eta = \sum^p_{j=1} \beta_jx_j$), and link function (log link for Poisson). Because ticks were count data that were positively, right skewed and could take on positive values equal or greater than zero, a Poisson distribution was chosen as the special case of the exponential family which assumes the following density function
+
+$$f(y;\theta, \phi) = exp(\frac{y\theta - b(\theta)}{a(\phi)} + c(y,\phi) )$$
+
+where $\theta$ is the canonical parameter (= $ln\mu$ for Poisson) and $\phi$ is the dispersion parameter (= 1 for Poisson). The canonical link is $\eta = ln\mu$ and the dispersion parameter should equal or be close to 1. We assume that 1) y ~ $P(\mu)$, 2) the variance is V($\mu$) = $\mu$ and 3) the constraints on the mean are $\mu$ = E(y) > 0 so the ranges of $\mu$ and $\eta$ are different.
+
+
+The full list of attempted models can be found in the Appendix. The best candidate models are listed in the tables in the supplement and are compared against the null model (i.e. tick counts ~ 1), full model (i.e. tick counts ~ all variables), and best fitted life stage models (i.e. tick count for larva ~ best variables).
+
+
+
+```{r , include=FALSE}
+
+# `dragged_IxodesDerm_Climate_aggregate`
+# 
+# part (a) --> all life stages
+
+mod_2_0 <- glm(tick_tot ~ 1,
+               family = "poisson", 
+               data = dragged_IxodesDerm_Climate_aggregate)
+
+summary(mod_2_0)
+
+
+###
+mod_2_1 <- glm(tick_tot ~ life_stage + julian + ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+                 family = "poisson", 
+               data = dragged_IxodesDerm_Climate_aggregate)
+
+summary(mod_2_1)
+
+
+
+###
+mod_2_6 <- glm(tick_tot ~  julian + life_stage + ppt_month + tmean  + vpdmin,
+                 family = "poisson", 
+               data = dragged_IxodesDerm_Climate_aggregate)
+
+summary(mod_2_6) 
+
+
+```
+
+
+```{r, include=FALSE}
+### part (b) --> individual life stages
+
+## adult
+dragged_IxodesDerm_Climate_aggregate_A <- dragged_IxodesDerm_Climate_aggregate %>%
+  filter(life_stage == "A")
+
+
+mod_2_7 <- glm(tick_tot ~ julian + ppt_month + tmean  + vpdmin,
+                 family = "poisson", 
+               data = dragged_IxodesDerm_Climate_aggregate_A)
+
+summary(mod_2_7) 
+
+
+###
+dragged_IxodesDerm_Climate_aggregate_J <- dragged_IxodesDerm_Climate_aggregate %>%
+  filter(life_stage != "A")
+
+
+mod_2_8 <- glm(tick_tot ~  julian + ppt_month + tmean  + vpdmin,
+                 family = "poisson", 
+               data = dragged_IxodesDerm_Climate_aggregate_J)
+
+summary(mod_2_8)
+
+
+```
+
+
+```{r, include=FALSE}
+# Kables for full data set
+### kable
+
+
+climate_result <- AIC(mod_2_0, mod_2_1, mod_2_6, mod_2_7, mod_2_8)
+climate_models <- list(mod_2_0, mod_2_1, mod_2_6, mod_2_7, mod_2_8)
+climate_result$BIC <- sapply(climate_models, BIC)
+climate_model_summary <- lapply(climate_models, summary)
+for(i in 1:(length(climate_models)-1)){ #this creates a variable i that starts with the value i=1
+  climate_result$rsq[i] <- climate_model_summary[[i]]$r.squared #we assign the rsq value from model i to the i'th row of the column 'rsq' in the table 'results'
+  climate_result$adj_rsq[i] <- climate_model_summary[[i]]$adj.r.squared #same for adjusted rsq
+} #now we go back to the beginning of the for-loop, add 1 to the value of i, and do everything again
+climate_result$model <- c("null", "full", "best", "only adults", "only juveniles")
+climate_models_both <- kable(climate_result, digits = 2, align = "c", booktabs = TRUE) %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling()
+```
+
+```{r , include=FALSE}
+climate_models_both 
+
+save_kable(climate_models_both, "climate_models_both.pdf")
+
+```
+
+
+
+
+
+
+```{r, include=FALSE}
+# ##### Ixodes
+# `dragged_Ixodes_Climate_aggregate`
+
+# part (a) --> all life stages
+
+mod_2_00 <- glm(tick_tot ~ 1, 
+                family = "poisson",
+                data = dragged_Ixodes_Climate_aggregate)
+
+summary(mod_2_00)
+
+
+###
+mod_2_9 <- glm(tick_tot ~ life_stage + julian + ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+                 family = "poisson", 
+               data = dragged_Ixodes_Climate_aggregate)
+
+summary(mod_2_9)
+
+
+
+###
+mod_2_12 <- glm(tick_tot ~ life_stage + julian + ppt_month + tmin,
+                 family = "poisson", 
+               data = dragged_Ixodes_Climate_aggregate)
+
+summary(mod_2_12) # everything significant except lifestageL
+
+
+
+
+```
+
+
+
+```{r, include=FALSE}
+
+# part (b) --> individual life stages
+###
+## adult
+dragged_Ixodes_Climate_aggregate_A <- dragged_Ixodes_Climate_aggregate %>%
+  filter(life_stage == "A")
+
+
+mod_2_15 <- glm(tick_tot ~ julian + ppt_month + tmin,
+                 family = "poisson", 
+               data = dragged_Ixodes_Climate_aggregate_A)
+
+summary(mod_2_15) 
+
+
+###
+dragged_Ixodes_Climate_aggregate_J <- dragged_Ixodes_Climate_aggregate %>%
+  filter(life_stage != "A")
+
+
+mod_2_16 <- glm(tick_tot ~  julian + ppt_month + tmin,
+                 family = "poisson", 
+               data = dragged_Ixodes_Climate_aggregate_J)
+
+summary(mod_2_16)
+
+```
+
+
+```{r, include=FALSE}
+
+#Kables for full data set
+### kable
+
+
+climate_result <- AIC(mod_2_00, mod_2_9, mod_2_12, mod_2_15, mod_2_16)
+climate_models <- list(mod_2_00, mod_2_9, mod_2_12, mod_2_15, mod_2_16)
+climate_result$BIC <- sapply(climate_models, BIC)
+climate_model_summary <- lapply(climate_models, summary)
+for(i in 1:(length(climate_models)-1)){ #this creates a variable i that starts with the value i=1
+  climate_result$rsq[i] <- climate_model_summary[[i]]$r.squared #we assign the rsq value from model i to the i'th row of the column 'rsq' in the table 'results'
+  climate_result$adj_rsq[i] <- climate_model_summary[[i]]$adj.r.squared #same for adjusted rsq
+} #now we go back to the beginning of the for-loop, add 1 to the value of i, and do everything again
+climate_result$model <- c("null", "full", "best", "only adults", "only juveniles")
+climate_models_ixodes <- kable(climate_result, digits = 2, align = "c", booktabs = TRUE) %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling()
+
+```
+
+```{r , include=FALSE}
+climate_models_ixodes 
+
+save_kable(climate_models_ixodes, "climate_models_ixodes.pdf")
+
+```
+
+
+
+
+
+
+```{r, include=FALSE}
+
+# ##### Dermacentor
+
+
+# `dragged_Derm_Climate_aggregate`
+
+#part (a) --> all life stages
+
+
+mod_2_000 <- glm(tick_tot ~ 1, 
+                 family = "poisson", 
+                 data = dragged_Derm_Climate_aggregate)
+
+summary(mod_2_000)
+
+
+###
+mod_2_17 <- glm(tick_tot ~ life_stage + julian + ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+                 family = "poisson", 
+               data = dragged_Derm_Climate_aggregate)
+
+summary(mod_2_17)
+
+
+
+
+
+
+
+###
+mod_2_20 <- glm(tick_tot ~  life_stage + ppt_month + tmin  + vpdmin,
+                 family = "poisson", 
+               data = dragged_Derm_Climate_aggregate)
+
+summary(mod_2_20)
+
+```
+
+
+
+
+```{r, include=FALSE}
+
+# part (b) --> individual life stages
+###
+## adult
+dragged_Derm_Climate_aggregate_A <- dragged_Derm_Climate_aggregate %>%
+  filter(life_stage == "A")
+
+
+mod_2_21 <- glm(tick_tot ~ ppt_month + tmin  + vpdmin,
+                 family = "poisson", 
+               data = dragged_Derm_Climate_aggregate_A)
+
+summary(mod_2_21) 
+
+
+###
+dragged_Derm_Climate_aggregate_J <- dragged_Derm_Climate_aggregate %>%
+  filter(life_stage != "A")
+
+
+mod_2_22 <- glm(tick_tot ~  ppt_month + tmin  + vpdmin,
+                 family = "poisson", 
+               data = dragged_Derm_Climate_aggregate_J)
+
+summary(mod_2_22)
+
+```
+
+
+```{r, include=FALSE}
+
+#Kables for full data set
+
+### kable
+
+
+climate_result <- AIC(mod_2_000, mod_2_17, mod_2_20, mod_2_21, mod_2_22)
+climate_models <- list(mod_2_000, mod_2_17, mod_2_20, mod_2_21, mod_2_22)
+climate_result$BIC <- sapply(climate_models, BIC)
+climate_model_summary <- lapply(climate_models, summary)
+for(i in 1:(length(climate_models)-1)){ #this creates a variable i that starts with the value i=1
+  climate_result$rsq[i] <- climate_model_summary[[i]]$r.squared #we assign the rsq value from model i to the i'th row of the column 'rsq' in the table 'results'
+  climate_result$adj_rsq[i] <- climate_model_summary[[i]]$adj.r.squared #same for adjusted rsq
+} #now we go back to the beginning of the for-loop, add 1 to the value of i, and do everything again
+climate_result$model <- c("null", "full", "best", "only adults", "only juveniles")
+climate_models_derm <- kable(climate_result, digits = 2, align = "c", booktabs = TRUE) %>%
+    row_spec(0, bold = TRUE) %>%
+  kable_styling()
+
+```
+
+```{r , include=FALSE}
+climate_models_derm
+
+save_kable(climate_models_derm, "climate_models_derm.pdf")
+
+```
+
+
+
+
+
+
+```{r, include=FALSE}
+#### Lizard ticks
+
+# (only Ixodes)
+
+#`lizard_long_Climate`
+
+# poisson or negative binomial?
+names(lizard_long_Climate)[6] <- "tick_tot"
+
+hist(lizard_long_Climate$tick_tot)
+hist(log(lizard_long_Climate$tick_tot +1))
+
+# may need to do neg binomial since count is more overdispersed
+
+
+# remove NAs to calculate mean and sd
+data_partial_nona <- lizard_long_Climate %>%
+  filter(lizard_long_Climate$tick_tot != "NA")
+
+
+with(data_partial_nona, tapply(tick_tot,life_stage, function(x) {
+    sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
+}))
+
+# larval >> "M (SD) = 2.65 (5.54)" nympal >> "M (SD) = 2.66 (3.97)" 
+
+# look at poisson
+mod_2_23_p <- glm(tick_tot ~ ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+                 family = "poisson", 
+               data = lizard_long_Climate)
+
+summary(mod_2_23_p)
+
+# dispersion = ~ 3
+
+mod_2_23_nb <- glm.nb(tick_tot ~  ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+               data = lizard_long_Climate)
+
+summary(mod_2_23_nb)
+
+# perform a likleihood ratio test 
+pchisq(2*(logLik(mod_2_23_p) - logLik(mod_2_23_nb)), df = 1, lower.tail = FALSE)
+
+# looks like poisson is better
+```
+
+
+
+
+```{r, include=FALSE}
+# Build models
+
+#part (a) --> all life stages
+
+mod_2_0000 <- glm(count ~ 1, 
+                  family = "poisson",
+                  data = lizard_long_Climate)
+
+###
+mod_2_23 <- glm(count ~ life_stage  + ppt_month + tmax + tmean + tmin + vpdmax + vpdmin,
+                 family = "poisson", 
+               data = lizard_long_Climate)
+
+summary(mod_2_23)
+
+
+
+
+
+###
+mod_2_26 <- glm(count ~ tmean   + tmin + vpdmin,
+                 family = "poisson", 
+               data = lizard_long_Climate)
+
+summary(mod_2_26) # everything significant except lifestageL
+
+```
+
+
+
+```{r, include=FALSE}
+
+# part (b) --> individual life stages
+###
+## nymph
+lizard_long_Climate_N <- lizard_long_Climate %>%
+  filter(life_stage == "nymphal")
+
+
+mod_2_27 <- glm(count ~ tmean   + tmin + vpdmin,
+                 family = "poisson", 
+               data = lizard_long_Climate_N)
+
+summary(mod_2_27) 
+
+
+###
+lizard_long_Climate_L <- lizard_long_Climate %>%
+  filter(life_stage != "nymphal")
+
+
+mod_2_28 <- glm(count ~  tmean   + tmin + vpdmin,
+                 family = "poisson", 
+               data = lizard_long_Climate_L)
+
+summary(mod_2_28)
+
+```
+
+
+```{r, include=FALSE}
+
+# Kables for full data set
+### kable
+
+
+climate_result <- AIC(mod_2_0000, mod_2_23, mod_2_26, mod_2_27, mod_2_28)
+climate_models <- list(mod_2_0000, mod_2_23, mod_2_26, mod_2_27, mod_2_28)
+climate_result$BIC <- sapply(climate_models, BIC)
+climate_model_summary <- lapply(climate_models, summary)
+for(i in 1:(length(climate_models)-1)){ #this creates a variable i that starts with the value i=1
+  climate_result$rsq[i] <- climate_model_summary[[i]]$r.squared #we assign the rsq value from model i to the i'th row of the column 'rsq' in the table 'results'
+  climate_result$adj_rsq[i] <- climate_model_summary[[i]]$adj.r.squared #same for adjusted rsq
+} #now we go back to the beginning of the for-loop, add 1 to the value of i, and do everything again
+climate_result$model <- c("null", "full", "best", "nymphs", "larvae")
+climate_models_liz <- kable(climate_result, digits = 2, align = "c", booktabs = TRUE) %>%
+    row_spec(0, bold = TRUE) %>%
+  kable_styling()
+
+```
+
+```{r , include=FALSE}
+climate_models_liz
+
+save_kable(climate_models_liz, "climate_models_liz.pdf")
+
+```
+**Drag analysis as a whole**
+
+To get a better idea of strength of effects for each climate variable, I have plotted the exponenated co-efficients for the best fit models (**Fig. 6**) that looked at juvenile data for 1) Ixodes and Dermacentor, 2) Ixodes and 3) Dermacentor. The outcome of each model was tick counts from a poisson generalized linear regression.
+```{r}
+#plot_summs(mod_2_6, mod_2_8, mod_2_12, mod_2_16, mod_2_20, mod_2_21)
+
+#plot_summs(mod_2_6, mod_2_8, mod_2_12, mod_2_16, mod_2_20, mod_2_21, scale = TRUE)
+
+#plot_summs(mod_2_6, mod_2_12, mod_2_20)
+
+plot_summs(mod_2_8, mod_2_16, mod_2_21, 
+           scale = TRUE,
+           inner_ci_level = .8,
+           model.names = c("Ixodes & Dermacentor Juveniles", "Ixodes Juveniles", "Dermacentor Adults"),
+           #plot.distributions = TRUE,
+           exp = TRUE,
+           coefs = c("Julian Date" = "julian", "Precip. per Month" = "ppt_month",
+                     "Mean Temp." = "tmean", "Min VPD" = "vpdmin", 
+                     "Min Temp." = "tmin"))  +
+           theme(legend.position = "bottom",
+                 axis.text = element_text(face = "bold"))
+
+```
+
+
+## Results & Conclusion
+
+A total of **3,652** ticks were collected via drag cloth method (**n = 2,149**) and lizard burden (**n =  1,503**). For the drag cloth method, all life stages were collected and the predominant genus were Dermacentor spp. (**58.3 %, n = 1,254**), and Ixodes spp. (**41.6 %, n = 895**). On lizards, only larval and nymphal *I. pacificus* ticks were collected (Fig. 2). A total of **297** individual lizards were assessed for tick burdens.
+
+#### Dragged ticks
+
+
+##### Ixodes & Dermacentor:
+
+
+When evaluating the entire dataset that includes both Dermacentor spp. and Ixodes spp. for all life stages (**n = 2,149**), the best fit model included julian data, tmean, vpdmin, and ppt_month. This model (mod_2_6) had an AIC of **2308** which had a delta AIC bigger than 2 compared to the rest of the models while performing variable selection by stepAIC and doing stepwise regression. When evaluating the individual model (mod_2_6), all variables were significant especially precipitation per month (**p < 2e-16**) and julian date (**p = 1.08e-12**). This makes biological sense because all species of ticks use rain as a cue to become active (e.g. more likely to be sampled by drag cloth) and Dermacentor and Ixodes spp. have unique seasonality (e.g. different genuses peak at different times of the year) which is why julian date was a strong predictor for tick counts. Mean temperature (p = 1.30e-06) and minimum vdp (**p = 1.41e-06**) were also significant but maybe weren't quite as strong of predictors in this model because each genus of ticks have slighlty different biotic requirements (e.g. Dermacentor spp can tolerate higher mean temperatures while Ixodes prefer lower minimums of vpd). However, it is known that life stages of individual tick genuses also have different parameters for optimal abiotic conditions which was shown in the models that looked at only adults or only juveniles (larvae and nymphs) that performed better (**AIC < 1548**) than the model which lumped all life stages and gensues together (**AIC > 2276**). 
+
+##### Ixodes:
+
+
+
+Due to my results of the full model and knowledge that genuses and life stage of ticks have certain abiotic requirements, I then broke down the dataset into Ixodes spp. and Dermacentor spp. ticks to find a more fine scale climate predictors, especially for Ixodes spp. of ticks which vector Lyme disease and majority of the tick-borne diseases in California compared to Dermacentor. For Ixodes spp across all lifestages (**n = 895**), the best model based on AIC was the full model (mod_2_9, **AIC = 1503**), however to create the most parsimonious model that still achieved good explanation of data variance (i.e. complexity) I decided to go with mod_2_12 with the next lowest AIC of 1537. This candidate model contained predictors life stage, julian date (**p = 1.02e-06**), minimum temperature (**p = 0.031370**), precipitation per month (**p = 3.73e-08**) which were all significant except the individual level of larval life stage (note: I think this is possibly because we collected so few larvae via drag cloth). This was interesting because for the model that evaluated both Dermacentor and Ixodes spp. minimum vpd was a significant predictor but that was not the case when evaluating only Ixodes as well as minimum temperature was a predictor for Ixodes but not for the full dataset with Dermacentor and Ixodes. And once again when I evaluated the model for just adults or juveniles (larvae and nymphs) those models performed better (**AIC < 1002**) compared to the model that evaluated for all life stages of Ixodes (**AIC > 1503**).
+
+##### Dermacentor:
+
+
+To evaluate the differences between the full model and Ixodes model, I then selected for Dermacentor spp to see how that genus was driving climate trends. The best fit Dermacentor model by complexity and parismony was mo_2_20 which included life stage, minimum temperature, minimum vpd and precipitation per month, which were all highly signficant (with the exception of nymphal life stage, probably because we didn't sample too many of those). When evaluating for different life stages (adults vs juveniles), the juveniles were more signiciantly impacted by climate variables compared to adults, probably because juveniles physiology is more prone to drying out compared to adults and require more optimal micro-climates such as cool, humid environments. 
+
+Based on my apriori knowledge of tick biology and because models that evaluated life stages (adults vs juveniles) separately performed better than full models of both genuses or all life stages of a particular genus, I wanted to take the best fit life stage models for 1) Ixodes & Dermacentor, 2) Ixodes and 3) Dermacentor to better understand the scale of effect that climate predictors had. The strongest effect for all relationships was minimum vpd for the full model of juveniles with an odds ratio of 1.3, meaning for an increase in minimum vpd there would be a positive unit increase in tick counts for all genuses. Biologically, ticks have a certain humidity requirement, because if there's no humidity ticks will dry out and die, but if it's too humid (e.g. the tropics) than ticks can't move as efficiently through the enviornment so having a minimum humidity level (vpd) makes sense as a positive effect for overall tick counts of juveniles. Other noteworthy trends was minimum temperature on Dermacentor adults with the odds ratio of 1.1. Biologically this makes sense because Dermacentor adults have the thickest "skin" of all tick genus and life stages so they can withstand a higher temperature. And because Ixodes and Dermacentor spp ticks have slightly different seasonality (e.g. when they emerge throughout the year), it makes sense that julian data was a strong effect on the model that took into account both genuses.
+
+
+#### Lizard ticks
+
+
+
+For lizard ticks across larvae and nymphs (note, did not collect any adult ticks on lizards) the best model included mean temperature, minimum temperature, and minimum vpd which were all highly signficant (**p < .001**). When evaluating life stages independently, nymphs responded more significantly to these climate variables where mean and minimum temperature had a negative effect on nymph count (**estimates = -0.08454 and -0.11576**, respectively) whereas minimum vpd had a positive effect on nymph count (**estimate =  0.12007**). This makes sense where higher mean temperatures had lower nymphal counts because nymphs are sensitive to heat and low humidty. 
+
+
+## Final Remarks
+
+As ecotherms, ticks are highly sensitive to the environment, especially key climate characteristics like temperature, precipitation, and vapor pressure deficit (vpd). However, not all tick species or life stages respond in the same way to each characteristic. Sampling method (drag collection or lizard attached ticks) also proved to be quite different despite being sampled at the same time in the same geographic location. For those that are interested in juvenile tick populations (larvae and nymphs), which are key factors in pathogen maintainence, lizard sampling will be more effective that typical drag cloth sampling. I found that Dermacentor spp. counts were less likely to be impacted by max or minimum temperatures compared to Ixodes spp., most likley due to their thicker exterior. I also found that the best fit models took into consideration tick life stages since each life stage has different physical features and pysiological requirements. Future analysis that wants to predict tick distribution and abundance should take into account each tick species and life stage before making final predictions about tick-borne pathogen risk.  
+
+
+## Supplement
+
+Table outputs for model selection are below.
+
+![Models for Ixodes and Dermacentor spp ticks](climate_models_both.pdf)
+
+![Models for Ixodes spp ticks](climate_models_ixodes.pdf)
+
+![Models for Dermacentor spp ticks](climate_models_derm.pdf)
+
+
+
+![Models for Dermacentor spp ticks](climate_models_liz.pdf)
+
+
+Table outputs for best fit models:
+
+
+**Best fit for full model:**
+```{r}
+summ(mod_2_8)
+
+```
+
+
+**Best fit for Ixodes model:**
+```{r}
+summ(mod_2_16)
+```
+
+
+**Best fit for Dermacentor model:**
+```{r}
+summ(mod_2_21)
+```
+
+## References 
+
+Bibliography can be found in file "PSTAT220C_FinalProject_Bibliography.bib"
+
+
+
+
