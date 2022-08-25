@@ -1,0 +1,283 @@
+---
+title: "PSTAT236_project1"
+author: "sbsambado"
+date: "12/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+necessary libraries and variables
+```{r}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(ggpubr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(plyr)
+library(car)
+library(multcomp)
+library(multcompView)
+library(reshape2)
+library(stringr)
+library(car)
+library(psych)
+library(knitr)
+library(nlme)
+library(lme4)
+library(kableExtra)
+library(MASS)
+library(grid)
+library(ggfortify)
+library(jtools)
+library(effects)
+library(pscl)
+library(lmtest)
+library(latex2exp)
+
+rotatexaxistheme <- theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 0.5))
+ytitletheme <- theme(axis.title.y = element_text(face = 'bold', size = 12, vjust = 0.5))
+xtitletheme <- theme(axis.title.x = element_text(face = 'bold', size = 12, vjust = 0.5))
+```
+
+
+clean up data
+```{r}
+metadata <- read.csv("PSTAT236_metadata.csv")
+
+str(metadata)
+
+# rename properties
+unique(metadata$property)
+levels(metadata$property)[levels(metadata$property)== "Blue Oak Ranch Reserve"] <- "Blue Oak"
+levels(metadata$property)[levels(metadata$property)== "Garin/Dry Creek Pioneer"] <- "Garin/Dry Creek"
+levels(metadata$property)[levels(metadata$property)== "Garin/Dry Creek Pioneer Regional Park"] <- "Garin/Dry Creek"
+levels(metadata$property)[levels(metadata$property)== "Briones Regional Park"] <- "Briones"
+levels(metadata$property)[levels(metadata$property)== "Pleasanton Ridge Regional Park"] <- "Pleasanton Ridge"
+unique(metadata$property)
+
+# transform date 
+#metadata$date <-mdy(metadata$date)
+# levels to seasons
+
+metadata$season = factor(metadata$season,
+                         levels = c("Winter", "Spring", "Summer", "Early Fall"))
+
+# transform factors into numeric
+metadata$amphibian_svl <- as.numeric(metadata$amphibian_svl)
+metadata$amphibian_weight <- as.numeric(metadata$amphibian_weight)
+metadata$amphibian_sex <- as.numeric(metadata$amphibian_sex)
+metadata$amphibian_age <- as.numeric(metadata$amphibian_age)
+metadata$totaldissolvedsolid <- as.numeric(metadata$totaldissolvedsolid)
+
+# omit outlier 
+metadata <-metadata[-c(201),]
+
+# transform qpcr to zoospore by x 80
+
+metadata$zoospore <- metadata$average_qpcr*80
+
+positives <- metadata[which(metadata$zoospore > "0"),]
+
+```
+
+
+zoospore plots
+```{r}
+
+ggplot(metadata, aes(x = property, y = log(zoospore + 1), color = season))+
+  geom_jitter(na.rm = TRUE)+
+  #ylim(0, 750) +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 0.5))+
+  labs(x = "Property", y = "Average zoospore count", title = "Amphibian Bd loads by property and season")+
+  ytitletheme + xtitletheme +
+  theme_bw()+
+   theme(plot.title = element_text(face = 'bold'))
+ggsave("InfectionloadPropertySeason_v1.pdf", dpi = 320)
+
+ggplot(positives, aes(x = property, y = log(zoospore + 1), color = season))+
+  geom_jitter(width = 0.25,na.rm = TRUE, alpha = .8, size = 2)+
+  #ylim(0, 750) +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 0.8))+
+  labs(x = "Property", y = "log(Average zoospore count + 1)", title = "Amphibian Bd loads by property and season")+
+  theme_bw()+
+  ytitletheme + xtitletheme +
+ggsave("InfectionloadPropertySeason_v2.pdf", dpi = 320)
+  
+
+ggplot(positives, aes(x = property, y = log(zoospore + 1)))+
+  geom_jitter(width = 0.25,na.rm = TRUE, alpha = .8, size = 2)+
+  facet_wrap(~season)+
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 0.8))+
+  labs(x = "Property", y = "log(Average zoospore count + 1)", title = "Amphibian Bd loads by property and season")+
+  ytitletheme + xtitletheme +
+  theme_bw()
+ggsave("InfectionloadPropertySeason_v3.pdf", dpi = 320)
+
+ggplot(positives, aes(x = season, y = log(zoospore + 1)))+
+  geom_boxplot(fill = 'gray89') +
+  geom_jitter(width = .2,aes(color = property))+
+  labs(x = "Season", y = "log(Average zoospore count + 1)", title = "Amphibian Bd loads by season")+
+  theme_bw() +
+  ytitletheme + xtitletheme +
+  theme(plot.title = element_text(face = 'bold'))
+ggsave("InfectionloadSeason_v2.pdf", dpi = 320)
+
+```
+
+environmental data
+```{r}
+pH <-ggplot(metadata, aes(x = code, y = ph,color = property))+
+  geom_point(size = 2.5) +
+  labs(x = "Individual site", y = "Water pH")+
+  theme_bw()+
+  xtitletheme + ytitletheme +
+  theme(axis.text.x = element_text(angle = 45, size = 4, vjust = 0.6))
+
+temp <- ggplot(metadata, aes(x = code, y = watertemp,color = property))+
+  geom_point(size = 2.5) +
+  labs(x = "Individual site", y = TeX(" \\textbf{Temperature (^0C)}"))+
+  theme_bw()+
+  xtitletheme + ytitletheme +
+  theme(axis.text.x = element_text(angle = 45, size = 4, vjust = 0.6))
+
+conduct <- ggplot(metadata, aes(x = code, y = conductivity_uS,color = property))+
+  geom_point(size = 2.5) +
+  labs(x = "Individual site", y = "Conductivity (uS)")+
+  theme_bw()+
+  xtitletheme + ytitletheme +
+  theme(axis.text.x = element_text(angle = 45, size = 4, vjust = 0.6))
+
+dissolved <- ggplot(metadata, aes(x = code, y = totaldissolvedsolid,color = property))+
+  geom_point(size = 2.5) +
+  labs(x = "Individual site", y = "Total dissolved solids")+
+  theme_bw()+
+  xtitletheme + ytitletheme +
+  theme(axis.text.x = element_text(angle = 45, size = 4, vjust = 0.6))
+
+salinity <-ggplot(metadata, aes(x = code, y = salinity_ppt,color = property))+
+  geom_point(size = 2.5) +
+  labs(x = "Individual site", y = "Salinity (ppt)")+
+  theme_bw()+
+  xtitletheme + ytitletheme +
+  theme(axis.text.x = element_text(angle = 45, size = 4, vjust = 0.6))
+
+water <-ggarrange(pH + rremove('xlab'), temp + rremove('xlab'), conduct, dissolved, salinity,
+         common.legend = TRUE, legend = 'bottom', align = 'v', vjust = 1)
+
+annotate_figure(water, fig.lab.pos = "top", top = text_grob('Pond Water Characteristics',
+                                       face = 'bold', size = '14', hjust = 1.1))
+ggsave("PondCharacteristics_v1.pdf", dpi = 320)
+
+
+```
+
+
+frogs data plots
+```{r}
+
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== "TAxx_1"] <- "TAXX"
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== "TAxx_2"] <- "TAXX"
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== "TAxx"] <- "TAXX" 
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== "TAXX"] <- "TAXX"
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== "na"] <- "NA"
+levels(metadata$amphibian_spp)[levels(metadata$amphibian_spp)== ""] <- "NA"
+
+unique(metadata$amphibian_spp)
+
+
+
+weight<-ggplot(metadata, aes(x = property, y = amphibian_weight))+
+  geom_boxplot(fill = 'gray89') +
+  geom_jitter(width = .2,aes(color = amphibian_spp))+
+  labs(x = "Property", y = "Amphibian weight (oz)")+
+  theme_bw() +
+  ytitletheme + xtitletheme +
+  theme(axis.text.x = element_text(angle = 30, size = 8, vjust = 0.6))
+ggsave("AmphibianWeightProperty_v1.pdf", dpi = 320)
+
+svl<-ggplot(metadata, aes(x = property, y = amphibian_svl))+
+  geom_boxplot(fill = 'gray89') +
+  geom_jitter(width = .2,aes(color = amphibian_spp))+
+  labs(x = "Property", y = "Amphibian SVL")+
+  theme_bw() +
+  ytitletheme + xtitletheme +
+  theme(axis.text.x = element_text(angle = 30, size = 8, vjust = 0.6))
+ggsave("AmphibianSVLProperty_v1.pdf", dpi = 320)
+
+
+frog<-ggarrange(weight, svl, common.legend = TRUE,  legend = 'bottom', align = 'v', vjust = 1)
+annotate_figure(frog, fig.lab.pos = "top", top = text_grob('Amphibian Characteristics',
+                                       face = 'bold', size = '14', hjust = 1.1))
+ggsave("AmphibianCharacteristics_v2.pdf", dpi = 320)
+
+
+```
+
+Summary tables for zoospore count and amphibian data
+```{r}
+install.packages("arsenal")
+library(arsenal)
+subset <- metadata[,-c(2,3,4,7,8,9,10,11,23,24)]
+
+as_tibble(subset)
+
+summary <-describeBy(subset, group = subset$property)
+
+table <- tableby(property ~ zoospore +amphibian_svl + amphibian_weight, data = subset)
+frogtable <-summary(table, title = "Bd")
+
+table2 <- tableby(season ~ zoospore, data = subset)
+frogtable2 <-summary(table2, title = "Bd")
+
+```
+
+Predictor Effects plot for GLMs
+```{r}
+# frog predictors
+mod1 <- glm(log(zoospore + 1) ~ amphibian_weight + amphibian_svl + property, data = subset)
+
+pdf(file = "ZoosporePredictProperty.pdf")
+property2 <- plot(predictorEffects(mod1, ~ property))
+dev.off()
+
+pdf(file = "ZoosporePredictWeight.pdf")
+weight2 <-plot(predictorEffects(mod1, ~ amphibian_weight))
+dev.off()
+
+pdf(file = "ZoosporePredictSVL.pdf")
+svl2<-plot(predictorEffects(mod1, ~ amphibian_svl))
+dev.off()
+
+
+par(mfrow = c(2,1))
+# environmental predictors
+mod2 <- glm(log(zoospore + 1) ~ watertemp + ph + salinity_ppt + conductivity_uS + totaldissolvedsolid, data = subset)
+
+
+pdf(file = "ZoosporePredictPh.pdf")[[1]]
+ph2 <- plot(predictorEffects(mod2, ~ ph))
+dev.off()
+
+pdf(file = "ZoosporePredictTemp.pdf")
+watertemp2 <- plot(predictorEffects(mod2, ~ watertemp))
+dev.off()
+
+pdf(file = "ZoosporePredictSalinity.pdf")
+salinity2 <- plot(predictorEffects(mod2, ~ salinity_ppt))
+dev.off()
+
+conductivity2<- plot(predictorEffects(mod2, ~ conductivity_uS))
+
+pdf(file = "ZoosporePredictDissolvedSolid.pdf")
+plot(predictorEffects(mod2, ~ totaldissolvedsolid))
+dev.off()
+
+
+
+
+```

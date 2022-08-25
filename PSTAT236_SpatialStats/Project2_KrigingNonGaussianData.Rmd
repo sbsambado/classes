@@ -1,0 +1,58 @@
+---
+title: "Project 2"
+author: "sbsambado"
+date: "12/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+rm(list=ls())
+install.packages(c("neonUtilities","geoNEON", "metScanR"))
+library(neonUtilities)
+library(tidyverse)
+library(geoNEON)
+library(metScanR)
+
+zipsByProduct(dpID="DP1.00002.001", site="all", package="basic", check.size=T) # air temp
+
+stackByTable(filepath="/Users/sbsambado/Macrosystems/filesToStack10002/stackedFiles/airtemp.csv", folder=T)
+```
+
+
+```{r}
+# ticks
+ticks <- read.csv("/Users/samanthasambado/Macrosystems/filesToStack10093/stackedFiles/tck_fielddata.csv", header=T)
+#head(ticks)
+#unique(ticks$siteID)
+#tail(ticks)
+#nrow(ticks)
+# tick taxa
+ticks_taxa <- read.csv("/Users/samanthasambado/Macrosystems/filesToStack10093/stackedFiles/tck_taxonomyProcessed.csv", header=T)
+#head(ticks_taxa)
+#nrow(ticks_taxa)
+# mammals
+mams <- read.csv("/Users/samanthasambado/Macrosystems/filesToStack10072/stackedFiles/mam_pertrapnight.csv", header=T)
+#head(mams)
+#nrow(mams)
+# tick pathogens
+# tick_path <- read.csv("/Users/samanthasambado/Macrosystems/filesToStack10092/stackedFiles/tck_pathogen.csv", header=T)
+# #head(tick_path)
+# #nrow(tick_path)
+# 
+# 
+# # relative humidity
+# rh <- read.csv("/Users/samanthasambado/Macrosystems/filesToStack10098/stackedFiles/sensor_positions_0098.csv", header=T)
+# 
+# temp <- read.csv("/Users/sbsambado/Macrosystems/filesToStack10002/stackedFiles/", header = T)
+
+
+
+
+```
+
+y

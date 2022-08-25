@@ -1,0 +1,131 @@
+---
+title: "River Blindness in Liberia"
+author: "sbsambado"
+date: "12/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Regressin modelling for spatially referenced data
+
+```{r}
+rm(list=ls())
+library(PrevMap)
+rb <- read.csv("LiberiaRemoData.csv")
+Liberia.bndrs <- read.csv("Liberia_bndrs.csv")
+
+glm.fit <- glm(cbind(npos,ntest-npos)~I(utm_x/1000)+I(utm_y/1000),data=rb,family=binomial)
+
+summary(glm.fit)
+
+Liberia.grid.pred <- read.csv("Liberia_grid_pred.csv")
+
+# Estiamtes of the regression coefficients
+beta.hat <- coef(glm.fit)
+
+# Matrix of the explanatory variables at prediction locations
+D.pred <- as.matrix(cbind(1,Liberia.grid.pred/1000))
+
+# Linear predictor at the prediction locations
+eta.hat <- D.pred%*%beta.hat
+
+# Covariance matrix of the regression coefficients
+beta.covar <- vcov(glm.fit)
+
+# Standard errors of the linear predictor
+se.eta.hat <- sqrt(diag(D.pred%*%beta.covar%*%t(D.pred)))
+
+# Exceedance probabilities of 20% threshold
+exceed.20 <- 1-pnorm(-log(4),mean=eta.hat,sd=se.eta.hat)
+
+# Plot of the exceedance probabilities
+
+plot(rasterFromXYZ(cbind(Liberia.grid.pred/1000,exceed.20)))
+lines(Liberia.bndrs/1000,type="l")     
+
+
+check.spat <- spat.corr.diagnostic(npos~I(utm_x/1000)+I(utm_y/1000),
+                                   units.m = ~ntest,coords = ~I(utm_x/1000)+I(utm_y/1000),
+                                   data=rb,likelihood = "Binomial",
+                                   uvec=seq(20,300,length=15),n.sim=1000)
+
+```
+
+#Generalised linear geostatistical models
+
+```{r}
+rm(list=ls())
+library(PrevMap)
+rb <- read.csv("LiberiaRemoData.csv")
+Liberia.bndrs <- read.csv("Liberia_bndrs.csv")
+Liberia.grid.pred <- read.csv("Liberia_grid_pred.csv")
+
+
+# Maximum Likelihood estimation via the Laplace method
+fit.LA <- glgm.LA(npos~I(utm_x/1000)+I(utm_y/1000),
+                  units.m=~ntest,coords=~I(utm_x/1000)+I(utm_y/1000),kappa=0.5,
+                  start.cov.pars = 70,fixed.rel.nugget = 0,
+                  data=rb,family="Binomial")
+summary(fit.LA)
+
+par0 <- coef(fit.LA)
+c.mcmc <- control.mcmc.MCML(n.sim=42000,burnin=2000,thin=8)
+
+# Monte Carlo Maximum Likelihood estimation
+fit.MCML <- binomial.logistic.MCML(npos~I(utm_x/1000)+I(utm_y/1000),
+                                   units.m=~ntest,coords=~I(utm_x/1000)+I(utm_y/1000),kappa=0.5,
+                                   start.cov.pars = 70,fixed.rel.nugget = 0,
+                                   control.mcmc = c.mcmc,par0 = par0,
+                                   data=rb,method="nlminb")
+
+# Model validation
+variog.diag <- variog.diagnostic.glgm(fit.LA,n.sim=1000)
+
+# Spatial prediction
+pred <- spatial.pred.binomial.MCML(fit.LA,grid.pred = Liberia.grid.pred/1000,
+                                   predictors = Liberia.grid.pred,control.mcmc = c.mcmc,
+                                   scale.predictions = "prevalence",
+                                   thresholds = 0.2,
+                                   scale.thresholds = "prevalence")
+
+par(mfrow=c(1,2),mar=c(3,3,3,4))
+plot(pred,"prevalence","predictions",main="Predictions")
+contour(pred,"prevalence",add=TRUE,levels=0.2)
+lines(Liberia.bndrs/1000)
+plot(pred,summary="exceedance.prob",main="Exceedance probabilities")
+lines(Liberia.bndrs/1000)
+contour(pred,summary="exceedance.prob",add=TRUE,levels=c(0.25,0.75))
+
+s.LA <- summary(fit.LA)
+s.MCML <- summary(fit.MCML)
+
+
+tab.LA <- rbind(
+  cbind(s.LA$coefficients[,1],
+        s.LA$coefficients[,1]-qnorm(0.975)*s.LA$coefficients[,2],
+        s.LA$coefficients[,1]+qnorm(0.975)*s.LA$coefficients[,2]),
+  cbind(s.LA$cov.pars[,1],
+        s.LA$cov.pars[,1]-qnorm(0.975)*s.LA$cov.pars[,2],
+        s.LA$cov.pars[,1]+qnorm(0.975)*s.LA$cov.pars[,2])
+)
+
+tab.MCML <- rbind(
+  cbind(s.MCML$coefficients[,1],
+        s.MCML$coefficients[,1]-qnorm(0.975)*s.MCML$coefficients[,2],
+        s.MCML$coefficients[,1]+qnorm(0.975)*s.MCML$coefficients[,2]),
+  cbind(s.MCML$cov.pars[,1],
+        s.MCML$cov.pars[,1]-qnorm(0.975)*s.MCML$cov.pars[,2],
+        s.MCML$cov.pars[,1]+qnorm(0.975)*s.MCML$cov.pars[,2])
+)
+
+tab <- cbind(tab.LA,tab.MCML)
+tab
+
+
+
+```
+

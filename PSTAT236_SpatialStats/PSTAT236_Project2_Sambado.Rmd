@@ -1,0 +1,705 @@
+---
+title: "Project2_geostatisticalmodels"
+author: "sbsambado"
+date: "12/17/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+This project is for PSTATS 236 at UCSB taught by Dr. Wendy Meiring.
+
+This is the second project of the class where I will focus on generalized geostatistical models to make spatial predictions of tick occurrences in the eastern United States (US). 
+
+I will use my own statistical analyses and then try out `PrevMap`, an R package for classicial and Bayesian inference on spatially referenced prevalence data put forth by Giorgi and Diggle (2016).
+
+
+# The geostatitical models attempted came from code provided by Diggle & Giorgi (2019) for model-based geostatistics 
+
+A. First wanted to model my efforts after Diggle's example of mosquitos in Cameroon (counts - Poisson) [Chapter 5.5.2]
+
++ **tick counts in the eastern US**
+
++ NEON Data Product DP1.10093.001
+
+Note, I split analyses into two groups; **full** for all NEON tick sites or **partial** for three NEON tick sits depending how computationally heavy the task is. 
+
+
+B. I then wanted to try Diggle's example of river blindness in Liberia (prevalence - binary) [Chapter 5.5.1]
+
++ **tick pathogen prevalence in the eastern US**
+
++ NEON Data Product DP1.10092.001
+
++ I did not get this section to work but I will keep trying my hand at it post this class!
+
+
+Import data sets and libraries
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(error = FALSE)
+knitr::opts_chunk$set(strip.white = TRUE)
+
+rm(list=ls())
+
+# digger's packages
+library(PrevMap)
+library(readr)
+library(tidyverse)
+library(dplyr)
+
+# my additional packages
+library(stats)
+library(base)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+library(lubridate)
+library(caret)
+library(splines)
+library(cowplot)
+
+
+# saved vectors for aesthetics
+
+clean_background <- theme(plot.background = element_rect("white"),
+        panel.background = element_rect("white"),
+        panel.grid = element_line("white"),
+        axis.line = element_line("gray25"),
+        axis.text = element_text(size = 12, color = "gray25"),
+        axis.title = element_text(color = "gray25"),
+        legend.text = element_text(size = 12),
+        legend.key = element_rect("white"))
+multiplottitletheme <- theme(plot.title = element_text(face = 'bold', hjust = 0.04, size = 10,  color = 'black', vjust = -6))
+rotatexaxistheme <- theme(axis.text.x = element_text(angle = 90, size = 8, vjust = 0.5))
+ytitletheme <- theme(axis.title.y = element_text(face = 'bold', size = 12, vjust = 0.5))
+xtitletheme <- theme(axis.title.x = element_text(face = 'bold', size = 12, vjust = 0.5))
+
+```
+
+
+#**A. tick counts in the eastern US**
+
+Upload data sets from NEON
+
+```{r}
+# tick numbers
+tck <- read_csv("tck_fielddata.csv")
+head(tck)
+
+
+# # tick pathogens
+# tck_pathogen <- read_csv("tck_pathogen.csv")
+# #View(tck_pathogen)
+
+```
+
+
+##Clean up data
+
+1. Select relevant columns for full data set
+```{r}
+
+# tick totals
+tckfull <- tck[,c(4,5,7,8,9,12,15,20,21,22,23,24)]
+head(tckfull)
+
+
+# # tick pathogens
+# tck_pathogenfull <- tck_pathogen[,c(4,5,7,8,9,12,14,20,23,24)]
+# head(tck_pathogenfull)
+
+# split up test results
+# 
+# # full
+# tck_test_full <- tck_pathogenfull %>% 
+#   group_by(testResult, siteID)%>% 
+#   summarise(count = n())
+# 
+# # partial
+# tck_testspartial <- tck_test_full[which(tck_test_full$siteID == "SERC" |
+#                                          tck_test_full$siteID == "SCBI" |
+#                                            tck_test_full$siteID == "BLAN"),]
+# # remove NAs
+# tck_testspartial <- tck_testspartial[which(tck_testspartial$testResult != "NA"),]
+```
+
+
+2. Subset data sets for Mid Atlantic sites 
+(hopefully this still will be large enough but not too large to run efficiently)
+
+```{r}
+
+## tick totals
+# ticks 3/3 midatlantic sites
+unique(tckfull$siteID)
+tck_sites <- tckfull
+unique(tck_sites$siteID)
+
+tck_sites_subset <-  tckfull[which( tckfull$siteID == "SCBI" |
+                           tckfull$siteID == "SERC" |
+                           tckfull$siteID == "BLAN"  ),]
+
+unique(tck_sites_subset$plotID)
+
+```
+
+
+3. More data cleaning to eliminate not relevant data
+```{r}
+
+## tick totals
+
+tck_subset <- tck_sites[which(tck_sites$targetTaxaPresent == 'Y'),]
+nrow(tck_subset)
+#View(tck_subset)
+
+# add new column that totals other count
+
+tck_subset<- tck_subset %>% 
+  mutate(total = select(.,adultCount, nymphCount, larvaCount) %>% 
+  rowSums(na.rm = TRUE))
+
+
+tck_SITEsubset <- tck_subset[which(tck_subset$siteID == "SCBI" |
+                                   tck_subset$siteID == "SERC"  |
+                                     tck_subset$siteID == "BLAN"),]
+#View(tck_subset)
+# select relevant rows for digger's code
+tck_small <-tck_subset[,c(1,4,5,6,13)]
+
+# reorder tick to fit digger's code
+tck_order <- tck_small[,c(2,3,1,5,4)]
+
+tck_order <- tck_order[which(tck_order$elevation < 1000),]
+
+```
+
+## Check out the data
+
+1. Visualize 
+
++ untransformed
++ log transformed
+
+2. Shapiro-wilk test (normality)
+
++ assuming it will not be normal due to the Poisson nature of the data
+
+```{r}
+
+############################################################ 1. visualize data
+# I am assuming there will not be a normal distribution of data based on counts of ticks
+
+### full data set
+
+full <- ggplot(tck_order, aes(x = total))+
+  geom_histogram()+
+  theme_bw() +
+    labs(x = "Total ticks") +
+  ggtitle("Total ticks across all NEON sites")
+
+# log it 
+full_log <- ggplot(tck_order, aes(x = log(total+1)))+
+  geom_histogram()+
+  theme_bw() +
+  labs(x = "Total ticks") +
+  ggtitle("log(Total ticks) across all NEON sites")
+
+ggarrange(full, full_log)
+ggsave("histogramfull.pdf", dpi = 320)
+
+
+### partial data set
+partial <- ggplot(tck_SITEsubset, aes(x = total))+
+  geom_histogram()+
+  theme_bw() +
+    labs(x = "Total ticks") +
+  ggtitle("Total ticks across Mid Atlantic sites")
+
+partial_log <- ggplot(tck_SITEsubset, aes(x = log(total+1)))+
+  geom_histogram()+
+  theme_bw() +
+  labs(x = "Total ticks") +
+  ggtitle("log(Total ticks) across Mid Atlantic sites")
+
+
+ggarrange(partial, partial_log)
+ggsave("histogrampartial.pdf", dpi = 320)
+
+
+## unlogged data
+
+ggarrange(full, partial)
+ggsave("histogramnonloggedboth.pdf", dpi = 320)
+
+ggarrange(full_log, partial_log)
+ggsave("histogramLOGGEDboth.pdf", dpi = 320)
+
+# I will use the log version since it is slightly better
+
+library(car)
+
+qqPlot_full <-qqPlot(tck_order$total,
+                      main = "Full tick data set",
+                      ylab = "Tick Counts")
+#pdf("qqPlots_full.pdf")
+qqPlot_partial <-qqPlot(tck_SITEsubset$total,
+                      main = "Partial tick data set",
+                      ylab = "Tick Counts")
+ggsave("QQPlots_partial.pdf", dpi = 320)
+
+############################################################ 2. Check for normality
+
+# H0 : data are normally distributed
+# HA : data are not normally distributed
+# p > 0.05, data are normal
+
+### full data set
+
+shapiro.test(log(tck_order$total+ 1)) # p-value < 2.2e-16
+# data are not normal, despite the CTL
+
+### mid atlantic data set
+
+shapiro.test(log(tck_SITEsubset$total+ 1)) # p-value < 2.2e-16
+# data are not normal
+
+```
+
+
+## Exploratory Data Analaysis for partial data set
+
+```{r}
+
+#plot(tck_SITEsubset)
+
+nozeros_partial <- tck_SITEsubset[which(tck_SITEsubset$total > 0),]
+nozeros_partial <- tck_SITEsubset[which(tck_SITEsubset$totalSampledArea > 100),]
+
+ggplot(nozeros_partial, aes(x = siteID, y = log(total+1)))+
+  geom_boxplot()+
+  geom_jitter(aes(color = plotID), alpha = .7)+
+  theme_bw() +
+  labs(x = "siteID", y = "log(tick counts + 1)")
+ggsave("boxplotcounts_plotID_partial.pdf", dpi = 320)
+
+ggplot(nozeros_partial, aes(x =nlcdClass , y = log(total+1)))+
+  geom_boxplot()+
+  geom_jitter(aes(color = plotID), alpha = .7)+
+  theme_bw() +
+  labs(x = "Habitat type sampled", y = "log(tick counts + 1)")
+ggsave("boxplotcounts_nlcd_partial.pdf", dpi = 320)
+
+ggplot(nozeros_partial, aes(x = totalSampledArea , y = log(total+1)))+
+  geom_jitter(aes(color = plotID), alpha = .7)+
+  geom_smooth(color = 'black',aes(ymin = ifelse(..ymin.. < 0, 0, ..ymin..)))+
+  theme_bw() +
+  labs(x = "sampled area (m^2)", y = "log(tick counts + 1)")
+ggsave("boxplotcounts_sampledarea_partial.pdf", dpi = 320)
+
+ggplot(nozeros_partial, aes(x = totalSampledArea , y = log(total+1)))+
+  geom_boxplot()+
+  geom_jitter(aes(color = plotID), alpha = .7)+
+  facet_wrap(~siteID)+
+  theme_bw() +
+  labs(x = "sampled area (m^2)", y = "log(tick counts + 1)")
+ggsave("boxplotcounts_sampledarea_facet_partial.pdf", dpi = 320)
+
+
+```
+
+
+Basic plots - not part of analysis, just supplemental graphs
+```{r}
+# (prelim_plot <- ggplot(tck_order, aes(x = decimalLongitude, y = decimalLatitude, 
+#     colour = siteID)) +
+#     geom_point())
+
+# regular GLM (non-spatial) for all NEON sites
+x <- aggregate(total~ elevation + siteID, data = tck_order, FUN = sum)
+(prelim_plot2 <- ggplot(x, aes(x = elevation, y = log(total +1))) +
+    geom_point(aes(color = siteID)) +
+    geom_smooth(col = 'black',aes(ymin = ifelse(..ymin.. < 0, 0, ..ymin..))) +
+    clean_background +
+    labs(y = "log(total ticks)"))
+ggsave("GLMallsites.pdf", dpi = 320)
+
+
+library(rworldmap)
+library(ggmap)
+
+world <- getMap(resolution = "low")
+# (with_world <- ggplot() +
+# 	geom_polygon(data = world, 
+# 		aes(x = long, y = lat, group = group),
+# 		fill = NA, colour = "black") + 
+# 	geom_point(data = tck_order,  # Add and plot species data
+# 		aes(x = decimalLongitude, y = decimalLatitude)) +
+# 	coord_quickmap() +  # Prevents stretching when resizing
+# 	theme_classic() +  # Remove ugly grey background
+# 	xlab("Longitude") +
+# 	ylab("Latitude")) 
+
+
+# Map of US with all NEON sites
+
+saf_countries <- c("United States of America")
+
+# Call the vector in `borders()`
+world_saf <- world[world@data$ADMIN %in% saf_countries, ]
+
+ggplot() +
+	geom_polygon(data = world_saf, 
+		aes(x = long, y = lat, group = group),
+		fill = NA, colour = "black") + 
+	geom_point(data = tck_order,  # Add and plot speices data
+		aes(x = decimalLongitude, y = decimalLatitude, color = siteID)) +
+	coord_quickmap() + 
+	xlim(-120, -65) +  # Set x axis limits, xlim(min, max)
+	ylim(25, 55) +  # Set y axis limits
+	theme_classic() +  # Remove ugly grey background
+	xlab("Longitude") +
+	ylab("Latitude") +
+  ggtitle(label = "NEON sites")
+ggsave("mapallsites.pdf", dpi = 320)
+
+
+# Map of Mid Atlandtic with some NEON sites 
+
+tck_sites_smol <- tck_order[which(tck_order$siteID == "SERC" |
+                          tck_order$siteID == "SCBI"|
+                          tck_order$siteID == "BLAN"),]
+
+library(ggrepel)
+ggplot() +
+	geom_polygon(data = world_saf, 
+		aes(x = long, y = lat, group = group),
+		fill = NA, colour = "black") + 
+	geom_point(data = tck_sites_smol,  
+		aes(x = decimalLongitude, y = decimalLatitude, color = siteID)) +
+	coord_quickmap() + 
+	xlim(-79, -73) +  # Set x axis limits, xlim(min, max)
+	ylim(35, 40) +  # Set y axis limits
+	theme_classic() +  # Remove ugly grey background
+	xlab("Longitude") +
+	ylab("Latitude") +
+  ggtitle(label = "NEON subset sites\n(Mid Atlantic Region")+
+  theme(legend.position = 'bottom', legend.box = 'horizontal')
+ggsave("mapmidatlantic.pdf", dpi = 320)
+
+```
+
+
+
+# Following Diggle code from (Chapter 2.2.2) 
+
+*Regression modeling for spatially referenced data*
+```{r}
+
+# log transformed
+plot(tck_order)
+points(tck_order[,c("decimalLongitude","decimalLatitude")],pch=20)
+plot(log(total + 1) ~ elevation, data = tck_order,pch=20,cex=0.5, ylab = "log(total tick counts)", main = "All Sites")
+glm.fit <- glm(log(total+1) ~ elevation, data = tck_order, family = poisson)
+summary(glm.fit)
+abline(glm.fit, col = 'red')
+ggsave("glmbaseplotallsites.pdf", dpi = 320)
+
+
+# subset
+plot(tck_sites_smol)
+points(tck_sites_smol[,c("decimalLongitude","decimalLatitude")],pch=20)
+plot(log(total + 1) ~ elevation, data = tck_sites_smol,pch=20,cex=0.5, ylab = "log(total tick counts)", main = "Mid Atlantic Sites")
+glm.fit <- glm(log(total+1) ~ elevation, data = tck_sites_smol, family = poisson)
+summary(glm.fit)
+abline(glm.fit, col = 'red')
+ggsave("glmbaseplotmidatlanticsites.pdf", dpi = 320)
+
+library(modelsummary)
+modelsummary(glm.fit, output = 'regression_partial_table.tex',
+             title = "Regression model for partial data set",
+             stars = TRUE)
+
+  
+  
+```
+
+
+# Following Digger's example of mosquitoes in Cameroon (Chapter 5.5.2)
+
+*Generalized linear geostatistical models* 
+```{r}
+library(PrevMap)
+library(geoR)
+
+# using subset data
+tck_order <- as.data.frame(tck_sites_smol, na.omit = TRUE)
+
+
+tck_Order <- aggregate(total~ decimalLatitude + decimalLongitude + elevation,
+                       data = tck_sites_smol, FUN = sum)
+
+#tck_Order <- tck_order[,-c(3)]
+fit.LA <- glgm.LA(total~elevation,
+                  coords=~I(decimalLongitude)+I(decimalLatitude),kappa=0.5,
+                  start.cov.pars = 20,fixed.rel.nugget = 0,
+                  data=tck_Order,family="Poisson")
+
+par0 <- coef(fit.LA)
+c.mcmc <- control.mcmc.MCML(n.sim=42000,burnin=2000,thin=8)
+fit.MCML <- poisson.log.MCML(total~elevation,control.mcmc = c.mcmc,
+                             par0=par0,
+                             coords=~I(decimalLatitude)+I(decimalLongitude),kappa=0.5,
+                             start.cov.pars = 1.523717640 ,fixed.rel.nugget = 0,
+                             data=tck_Order,method="nlminb",
+                             plot.correlogram = TRUE)
+
+summary(fit.MCML)
+
+# tried making a nice plot for my spatial predictions from the poisson.log.MCML but couldn't get it to work
+
+# # Model validation
+# variog.diag <- variog.diagnostic.glgm(fit.LA,n.sim=1000)
+# 
+# 
+# #select only utmx and utmy
+# 
+# grid.pred.ticks <- tck_Order
+# # Spatial prediction
+# pred <- spatial.pred.binomial.MCML(fit.LA,grid.pred = grid.pred.ticks,
+#                                    predictors = grid.pred.ticks,control.mcmc = c.mcmc,
+#                                    scale.predictions = "prevalence",
+#                                    thresholds = 0.2,
+#                                    scale.thresholds = "prevalence")
+```
+
+
+
+
+
+# **Prevalence Data** 
+
+**I was unable to get any of the other code below this to work to try using MCML to make spatial predictions for prevalence data.**
+
+## Following the River blindness example in Digger's book (Chapter 5.5.1)
+
+**Using tick pathogen prevalence in the eastern US**
+
+Clean up data
+```{r}
+# # tick pathogens midatlantic sites
+# tck_pathogen <- read_csv("tck_pathogen.csv")
+# #View(tck_pathogen)
+# tck_pathogenfull <- tck_pathogen[,c(4,5,7,8,9,12,14,20,23,24)]
+# head(tck_pathogenfull)
+# 
+# unique(tck_pathogenfull$siteID)
+# tck_pathogensites <- tck_pathogenfull[which(tck_pathogenfull$siteID == "SCBI" |
+#                           tck_pathogenfull$siteID == "SERC" |
+#                           tck_pathogenfull$siteID == "BLAN"),]
+# unique(tck_pathogensites$siteID)
+# unique(tck_pathogensites$testResult)
+# # only select for pathogens that were tested
+# nrow(tck_pathogensites)
+# tck_tested <- tck_pathogensites[which(tck_pathogensites$testResult == "Negative"|
+#                                        tck_pathogensites$testResult == "Positive" ),]
+# 
+# head(tck_tested)
+# tck_path_aggregate <- aggregate(individualCount ~ plotID + decimalLatitude + decimalLongitude + elevation +testResult,
+#                                 data = tck_tested, FUN = sum)
+# 
+# library(xlsx)
+# 
+# #write.xlsx(tck_path_aggregate, file = "path_aggregate.xlsx",
+#       #sheetName = "aggregate", append = FALSE)
+#  
+# # converted lat long to utm (https://www.latlong.net/lat-long-utm.html)
+# 
+# path_aggregate_utm <- read_csv("path_aggregate_utm.csv")
+# 
+# # make it look like rb
+# 
+# aggregate <- path_aggregate_utm[,c(1,3,4,5,6,7,9,10)]
+# 
+# aggregate <- aggregate[,c(1,2,3,5,6,7,8,4)]
+# 
+# Rb <-as.data.frame(aggregate)
+# names(Rb)[4] <- "ntest"
+# #Rb <- Rb[,c(1:7)]
+# #Rb <- Rb[c(1:15),]
+
+## tick pathogens
+# tick pathogens 3/3 midatlantic sites
+# 
+# unique(tck_pathogenfull$siteID)
+# tck_pathogensites <- tck_pathogenfull[which(tck_pathogenfull$siteID == "SCBI" |
+#                           tck_pathogenfull$siteID == "SERC" |
+#                           tck_pathogenfull$siteID == "BLAN"  ),]
+# unique(tck_pathogensites$siteID)
+# 
+# # give tested values
+# tck_testspartial$tested <- ifelse(tck_testspartial$testResult == "Positive", 1,1)
+# tck_test_full$tested <- ifelse(tck_test_full$testResult == "Positive", 1,1)
+# 
+# #View(tck_sites)
+# nrow(tck_sites)
+
+
+```
+
+Basic graphs
+```{r}
+# ggplot(tck_path_aggregate, aes(x = plotID, y = individualCount, color = testResult))+
+#   geom_point(alpha = .7, aes(size = 3)) +
+#   theme_minimal() +
+#   rotate_x_text() +
+#   guides(size = FALSE)
+
+
+```
+
+*Regression modelling for spatially referenced data*
+```{r}
+# #rm(list=ls())
+# library(PrevMap)
+# #rb <- read.csv("LiberiaRemoData.csv")
+# #Liberia.bndrs <- read.csv("Liberia_bndrs.csv")
+# 
+# head(Rb)
+# glm.fit <- glm(cbind(npos,ntest-npos)~I(utm_x)+I(utm_y),data=Rb,family=binomial)
+# summary(glm.fit)
+# 
+# NEON.grid.pred <- Rb[,c(6,7)]
+# #Liberia.grid.pred <- read.csv("Liberia_grid_pred.csv")
+# 
+# # Estiamtes of the regression coefficients
+# beta.hat <- coef(glm.fit)
+# 
+# # Matrix of the explanatory variables at prediction locations
+# D.pred <- as.matrix(cbind(1,NEON.grid.pred))
+# 
+# # Linear predictor at the prediction locations
+# eta.hat <- D.pred%*%beta.hat
+# 
+# # Covariance matrix of the regression coefficients
+# beta.covar <- vcov(glm.fit)
+# 
+# # Standard errors of the linear predictor
+# se.eta.hat <- sqrt(diag(D.pred%*%beta.covar%*%t(D.pred)))
+# 
+# # Exceedance probabilities of 20% threshold
+# exceed.20 <- 1-pnorm(-log(4),mean=eta.hat,sd=se.eta.hat)
+# 
+# # Plot of the exceedance probabilities
+# 
+# library(raster)
+# 
+# Rb <- as.data.frame(Rb)
+# dt <- as.data.frame(Rb, xy = TRUE)
+# ras <- rasterFromXYZ(dt)
+# plot(ras)
+# #setnames(dt, "p190001", "z")
+# 
+# plot(rasterFromXYZ(cbind(NEON.grid.pred,exceed.20)))
+# lines(NEON.bndrs,type="l")     
+# 
+# check.spat <- spat.corr.diagnostic(npos~I(utm_x)+I(utm_y),
+#                                    units.m = ~ntest,coords = ~I(utm_x)+I(utm_y),
+#                                    data=dt,likelihood = "Binomial",n.sim=1000)
+#                                    #uvec=seq(20,300,length=15),n.sim=1000)
+
+```
+
+*Generalized linear geostatistical models*
+```{r}
+# library(PrevMap)
+# rb <- read.csv("LiberiaRemoData.csv")
+# # Liberia.bndrs <- read.csv("Liberia_bndrs.csv")
+# # Liberia.grid.pred <- read.csv("Liberia_grid_pred.csv")
+# 
+# View(Rb)
+# View(rb)
+# str(rb)
+# 
+# square <- as.data.frame(square)
+# solve(square)
+# cov(square)
+# # Maximum Likelihood estimation via the Laplace method
+# fit.LA <- glgm.LA(npos~I(utm_x/1000)+I(utm_y/1000),
+#                   units.m=~ntest,coords=~I(utm_x)+I(utm_y),kappa=0.5,
+#                   start.cov.pars = 70,fixed.rel.nugget = 0,
+#                   data=rb,family="Binomial")
+# 
+# summary(fit.LA)
+# 
+# par0 <- coef(fit.LA)
+# c.mcmc <- control.mcmc.MCML(n.sim=42000,burnin=2000,thin=8)
+# 
+# # Monte Carlo Maximum Likelihood estimation
+# fit.MCML <- binomial.logistic.MCML(npos~I(utm_x)+I(utm_y),
+#                                    units.m=~ntest,coords=~I(utm_x)+I(utm_y),kappa=0.5,
+#                                    start.cov.pars = 70,fixed.rel.nugget = 0,
+#                                    control.mcmc = c.mcmc,par0 = par0,
+#                                    data=rb,method="nlminb")
+# 
+# # Model validation
+# variog.diag <- variog.diagnostic.glgm(fit.LA,n.sim=1000)
+# 
+# # Spatial prediction
+# pred <- spatial.pred.binomial.MCML(fit.LA,grid.pred = Liberia.grid.pred/1000,
+#                                    predictors = Liberia.grid.pred,control.mcmc = c.mcmc,
+#                                    scale.predictions = "prevalence",
+#                                    thresholds = 0.2,
+#                                    scale.thresholds = "prevalence")
+# 
+# par(mfrow=c(1,2),mar=c(3,3,3,4))
+# plot(pred,"prevalence","predictions",main="Predictions")
+# contour(pred,"prevalence",add=TRUE,levels=0.2)
+# lines(Liberia.bndrs/1000)
+# plot(pred,summary="exceedance.prob",main="Exceedance probabilities")
+# lines(Liberia.bndrs/1000)
+# contour(pred,summary="exceedance.prob",add=TRUE,levels=c(0.25,0.75))
+# 
+# s.LA <- summary(fit.LA)
+# s.MCML <- summary(fit.MCML)
+# 
+# 
+# tab.LA <- rbind(
+#   cbind(s.LA$coefficients[,1],
+#         s.LA$coefficients[,1]-qnorm(0.975)*s.LA$coefficients[,2],
+#         s.LA$coefficients[,1]+qnorm(0.975)*s.LA$coefficients[,2]),
+#   cbind(s.LA$cov.pars[,1],
+#         s.LA$cov.pars[,1]-qnorm(0.975)*s.LA$cov.pars[,2],
+#         s.LA$cov.pars[,1]+qnorm(0.975)*s.LA$cov.pars[,2])
+# )
+# 
+# tab.MCML <- rbind(
+#   cbind(s.MCML$coefficients[,1],
+#         s.MCML$coefficients[,1]-qnorm(0.975)*s.MCML$coefficients[,2],
+#         s.MCML$coefficients[,1]+qnorm(0.975)*s.MCML$coefficients[,2]),
+#   cbind(s.MCML$cov.pars[,1],
+#         s.MCML$cov.pars[,1]-qnorm(0.975)*s.MCML$cov.pars[,2],
+#         s.MCML$cov.pars[,1]+qnorm(0.975)*s.MCML$cov.pars[,2])
+# )
+# 
+# tab <- cbind(tab.LA,tab.MCML)
+# tab
+# 
+
+```
+
+
+# Citations
+
+**Diggle, P., and E. Giorgi**. Model-Based Geostatistics for Global Public Health: Methods and Applications. CRC Press, Taylor &amp; Francis Group, 2019. 
+
+
+**Giorgi, E., Diggle, P. J. (2016)**. PrevMap: an R package for prevalence mapping. Journal of Statistical Software. In press.
+
+**National Ecological Observatory Network. 2020. Data Product DP1.10093.001**, Ticks sampled using drag cloths. Provisional data downloaded from http://data.neonscience.org on December 19, 2020. Battelle, Boulder, CO, USA NEON. 2020.
+
+**National Ecological Observatory Network. 2020. Data Product DP1.10092.001**, Tick-borne pathogen status. Provisional data downloaded from http://data.neonscience.org on December 19, 2020. Battelle, Boulder, CO, USA NEON. 2020.

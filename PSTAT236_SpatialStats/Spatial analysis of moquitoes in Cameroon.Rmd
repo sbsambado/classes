@@ -1,0 +1,178 @@
+---
+title: "Generalised linear geostatistical models"
+author: "sbsambado"
+date: "12/9/2020"
+output: html_document
+---
+
+
+
+Anopheles gambiae mosquitoes in Southern Cameroon by Peter Diggles
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# Regression modelling for spatially referenced data
+
+```{r}
+rm(list=ls())
+library(PrevMap)
+library(readr)
+library(tidyverse)
+library(dplyr)
+
+mosq <- as.data.frame(anopheles)
+
+par(mfrow=c(1,1),mar=c(4,4,2,1))
+elev <- anopheles_elevation[-c(4:7)] 
+#elev <- read.csv("anopheles_elevation.csv")
+
+# don't know why i can't get this elevation to work
+class(elev)
+?rasterFromXYZ
+elev <- rasterFromXYZ(elev)
+
+anopheles <- read_csv("anopheles.csv")
+
+elev <- anopheles
+mosq <- anopheles
+plot(elev)
+points(mosq[,c("web_x","web_y")],pch=20)
+plot(log(An.gambiae) ~ elevation, data = mosq,pch=20,cex=0.5)
+glm.fit <- glm(An.gambiae ~ elevation, data = mosq, family = poisson)
+summary(glm.fit)
+abline(glm.fit)
+
+
+check.spat <- spat.corr.diagnostic(An.gambiae~elevation,
+                                   coords = ~I(web_x/1000)+I(web_y/1000),
+                                   data=mosq,likelihood = "Poisson",
+                                   uvec=seq(0,10,length=15),n.sim=10)
+```
+
+
+#Generalised linear geostatisitcal models 
+
+```{r}
+rm(list=ls())
+library(PrevMap)
+library(geoR)
+mosq <- read.csv("anopheles.csv")
+
+fit.LA <- glgm.LA(An.gambiae~elevation,
+                  coords=~I(web_x/1000)+I(web_y/1000),kappa=0.5,
+                  start.cov.pars = 20,fixed.rel.nugget = 0,
+                  data=mosq,family="Poisson")
+
+par0 <- coef(fit.LA)
+c.mcmc <- control.mcmc.MCML(n.sim=42000,burnin=2000,thin=8)
+fit.MCML <- poisson.log.MCML(An.gambiae~elevation,control.mcmc = c.mcmc,
+                             par0=par0,
+                             coords=~I(web_x/1000)+I(web_y/1000),kappa=0.5,
+                             start.cov.pars = 1.523717640 ,fixed.rel.nugget = 0,
+                             data=mosq,method="nlminb")
+
+summary(fit.MCML)
+
+```
+
+
+
+#Spatial data-handling (Vectors and Rasters)
+
+```{r}
+rm(list=ls())
+install.packages("classInt",dependencies = T,type="mac.binary")
+library(classInt)
+install.packages("rgdal")
+install.packages('sf', dependencies = T)
+library(sp)
+library(sf)
+
+Liberia.adm2 <- st_read("LBR_adm/LBR_adm2.shp")
+
+Liberia.adm2.utm <- st_transform(Liberia.adm2,32629)
+
+st_crs(Liberia.adm2.utm)
+
+Liberia.union <- st_union(Liberia.adm2.utm)
+
+
+Liberia.grid.sq <- st_make_grid(Liberia.adm2.utm,
+                                cellsize = 5000,
+                                what="centers")
+
+Liberia.inout <- st_intersects(Liberia.grid.sq,
+                               Liberia.union,
+                               sparse = FALSE)
+
+Liberia.grid <- Liberia.grid.sq[Liberia.inout]
+
+install.packages('tmap')
+library(tmap)
+
+Liberia.adm2.utm$Area <- st_area(Liberia.adm2.utm)
+
+Map.adm2.border <- 
+  tm_shape(Liberia.adm2.utm) + 
+  tm_borders() 
+
+map1 <- Map.adm2.border
+
+map2 <- Map.adm2.border+
+  tm_shape(Liberia.union)+tm_borders(lwd=2,col="red")+
+  tm_shape(Liberia.grid)+tm_dots(col="blue")
+
+map3 <- Map.adm2.border+
+  tm_fill("Area")+
+  tm_compass(type="8star", 
+             position = c("right","top"))+
+  tm_scale_bar(breaks = c(0,100,200),size=1,
+               position=c("center","bottom")) 
+
+tmap_arrange(map1,map2,map3,ncol=3)
+
+tmap_mode("view")
+map3
+
+library(raster)
+
+elev <- raster("LBR_alt/LBR_alt.gri")
+elev <- projectRaster(elev,
+                      crs="+init=epsg:32629")
+map.elev <- tm_shape(elev)+tm_raster(title="Elevation")+
+  tm_shape(Liberia.union)+tm_borders(col="black")
+map.elev
+
+Liberia.elev <- mask(elev,
+                     as(Liberia.union,"Spatial"))
+
+
+map.Liberia.elev <- tm_shape(Liberia.elev)+tm_raster(title="Elevation")+
+  tm_shape(Liberia.union)+tm_borders(col="black")
+map.Liberia.elev
+
+tmap_arrange(map.elev,map.Liberia.elev)
+
+
+sample.coords <- st_sample(Liberia.union,size=5)
+extract(elev,as(sample.coords,"Spatial"))
+
+water <- st_read("LBR_wat/LBR_water_lines_dcw.shp")
+water <- st_transform(water,32629)
+
+dist <- apply(st_distance(Liberia.grid,water),1,min)/1000
+dist.raster <- rasterFromXYZ(cbind(
+  st_coordinates(Liberia.grid),
+  dist),
+  crs="+init=epsg:32629")
+
+tm_shape(dist.raster)+tm_raster(title="Distance from river (km)")+
+  tm_shape(water)+tm_lines()
+
+```
+

@@ -1,0 +1,290 @@
+---
+title: "Co-Kriging in R (Rossiter, 2018)"
+author: "Imani Russell"
+date: "12/2/2020"
+output: html_document
+---
+### This R Markdown document contains the code for our exercise in executing the code directly from the technical note: Co-kriging in R (Rosseter, 2018). Much of the text included in this document is directly from the document, as this was the most helpful when working through the exercises and learning how to interpret the outputs.
+
+Load packages
+```{r}
+library(sp)
+library(gstat)
+```
+
+Read in dataframe
+```{r}
+metadata <- read.csv("~/PSTAT236/PSTAT236_metadata.csv", stringsAsFactors = F)
+
+# remove the last 2 columns (empty, just some strange artifact from the excel file)
+metadata <- metadata [-c (22, 23)]
+
+# check structure of the dataframe
+str(metadata)
+
+# convert numeric variables from character to numeric
+metadata$amphibian_svl <- as.numeric (metadata$amphibian_svl)
+metadata$amphibian_weight <- as.numeric (metadata$amphibian_weight)
+
+# remove tsk151 - likely an error (infection load is super super high)
+metadata <- metadata[-201, ]
+```
+
+Convert qpcr quantities to ZE (zoospore equivalents = # zoospores/swab)
+```{r}
+metadata$avg_inf <- metadata$average_qpcr * 80 
+
+# metadata is the complete dataset, including NAs
+#write.csv(metadata, "PSTAT236_metadata_final.csv")
+```
+
+Read in and look at the structure of the interpolation grid
+```{r}
+library(rgdal)
+grid <- readOGR("~/PSTAT236/grid_meta_26910.shp")
+frog <- readOGR("~/PSTAT236/meta_data_26910.shp") 
+
+# interpolation grid
+grid_coord <- as.data.frame(grid@coords)
+gridded (grid_coord) = ~coords.x1 + coords.x2
+
+frog@data$qpcr_a = as.numeric(frog@data$qpcr_a)
+frog@data$qpcr_b = as.numeric(frog@data$qpcr_b)
+frog@data$qpcr_c = as.numeric(frog@data$qpcr_c)
+
+frog@data$amphibian_svl <- as.numeric(frog@data$amphibia_2)
+metadata$amphibian_weight <- as.numeric (frog@data$amphibia_3)
+frog@data$avg_inf <- as.numeric(frog@data$average_qp) * 80 
+
+frog_not_na = frog[which(!is.na(frog@data$avg_inf)),]
+frog_pos = frog[which(frog@data$avg_inf >= 1.0),]
+
+ze_log = variogram(log(avg_inf) ~ 1, frog_pos)
+plot(ze_log)
+
+ze = variogram(avg_inf ~ 1, frog_pos)
+plot(ze)
+
+v.sph = fit.variogram(ze_log, vgm(10, "Sph", 30000, 1)) # Spherical Model
+v.exp = fit.variogram(ze_log, vgm(10, "Exp", 30000, 1)) # Exponential Model
+v.gau = fit.variogram(ze_log, vgm(10, "Gau", 30000, 1)) # gaussian model
+# vgm means psil = 1, range = 300, nugget = 1 (It's arbitrary)
+
+plot(ze_log, v.sph)
+plot(ze_log, v.exp)
+plot(ze_log, v.gau)
+
+v.sph = fit.variogram(ze, vgm(10000000000, "Sph", 30000, 1)) # Spherical Model
+v.exp = fit.variogram(ze, vgm(10000000000, "Exp", 30000, 1)) # Exponential Model
+v.gau = fit.variogram(ze, vgm(10000000000, "Gau", 30000, 1)) # gaussian model
+# vgm means psil = 1, range = 300, nugget = 1 (It's arbitrary)
+
+plot(ze, v.sph)
+plot(ze, v.exp)
+plot(ze, v.gau)
+```
+
+
+# separate infected from uninfected --> log-transforming negative infections is creating problems down the line, and adding a small constant also results in highly skewed data even after log-transforming. So we will analyze positive infections only (negative infections are also really important, so I will need to figure out how to incorporate that, or if it's really just 2 separate analyses for the spatial analysis too)
+```{r}
+# removing NAs from dataset
+df_no_na <- metadata[!is.na(metadata$avg_inf), ]
+
+# now I'm subsetting the dataframe we just made to include only positive infections
+df_pos <- df_no_na[df_no_na$avg_inf >= 1.0, ]
+
+# remove rows where lat/long are missing
+df_pos <- df_pos[!is.na(df_pos$lat), ]
+```
+
+## Now going into exercises from Co-kriging with the gstat package (Rossiter, 2018)
+
+# we want to map infection loads (target variable) - plot histograms of target variable (infection load) and log10 transformation
+```{r}
+require(lattice)
+
+h_1 <- histogram (~ avg_inf, df_pos, xlab = "Infection load", col = "thistle3")
+h_2 <- histogram (~ log10(avg_inf), df_pos, xlab = "log10(infection load)", col = "thistle3")
+
+print (h_1, split = c(1, 1, 2, 1), more = T)
+print (h_2, split = c(2, 1, 2, 1), more = F)
+
+# remove these variables
+rm (h_1, h_2)
+```
+We can see from these histograms that the untransformed infection loads are highly skewed to the left, due to the large proportion of low infection loads. However, log10-transforming the data results in a more normal distribution, so we will move forward working with the log10 transformed infection loads.
+
+# look at the proportions higher than each level
+```{r}
+# show the proportions higher than the various thresholds
+ph <- function (level) {
+  round (100 * sum (df_pos$avg_inf > level) / length (df_pos$avg_inf), 1)
+}
+
+p <- NULL; lvls <- c(100, 1000, 10000, 100000, 1000000)
+
+for (l in lvls) p <- c(p, ph(l))
+
+# display table of thresholds and proportions
+(data.frame (cbind (level = lvls, percent.higher = p)))
+
+rm (ph, l, lvls, p)
+```
+
+# choose (continuous) covariables based on our hypotheses
+## amphibian svl
+### larger body size probably means more zoospores (more surface area)
+## amphibian weight
+### same reasoning as for svl
+## ph
+### certain pH levels may be more hospitable for Bd survival
+## water temp
+### Bd is a cold-loving fungus, so ponds with lower water temperatures may be ideal for infections
+## conductivity
+
+## dissolved solids
+
+## salinity
+### one paper has mentioned Bd preferring more saline waters (within a freshwater range)
+
+## lat/long: coordinates where frog was captured <- how do we use this here?
+
+
+# plot histograms of the covariables and log(10) transformations
+```{r}
+h1 <- histogram (~ amphibian_svl, df_pos, xlab = "SVL", col = "#d53e4f")
+h2 <- histogram (~ amphibian_weight, df_pos, xlab = "Mass", col = "#fee08b")
+h3 <- histogram (~ ph, df_pos, xlab = "Ph", col = "#99d594")
+h4 <- histogram (~ watertemp, df_pos, xlab = "Water temperature", col = "#3288bd")
+h5 <- histogram (~ conductivity_uS, df_pos, xlab = "Water conductivity", col = "#998ec3")
+h6 <- histogram (~ totaldissolvedsolid, df_pos, xlab = "Total dissolved solids", col = "#8c510a")
+h7 <- histogram (~ salinity_ppt, df_pos, xlab = "Salinity", col = "#fc8d59")
+
+print (h1, split = c(1, 1, 4, 2), more = T)
+print (h2, split = c(2, 1, 4, 2), more = T)
+print (h3, split = c(3, 1, 4, 2), more = T)
+print (h4, split = c(4, 1, 4, 2), more = T)
+print (h5, split = c(1, 2, 4, 2), more = T)
+print (h6, split = c(2, 2, 4, 2), more = T)
+print (h7, split = c(3, 2, 4, 2), more = F)
+
+
+rm (h1, h2, h3, h4, h5, h6)
+```
+
+
+```{r}
+h1 <- histogram (~ log10(amphibian_svl), df_pos, xlab = "log10(SVL)", col = "#d53e4f")
+h2 <- histogram (~ log10(amphibian_weight), df_pos, xlab = "log10(Mass)", col = "#fee08b")
+h3 <- histogram (~ log10(ph), df_pos, xlab = "log10(pH)", col = "#99d594")
+h4 <- histogram (~ log10(watertemp), df_pos, xlab = "log10(Water temperature)", col = "#3288bd")
+h5 <- histogram (~ log10(conductivity_uS), df_pos, xlab = "log10(Water conductivity)", col = "#998ec3")
+h6 <- histogram (~ log10(totaldissolvedsolid), df_pos, xlab = "log10(Total dissolved solids)", col = "#8c510a")
+h7 <- histogram (~ log10(salinity_ppt), df_pos, xlab = "log10(Salinity)", col = "#fc8d59")
+
+
+print (h1, split = c(1, 1, 4, 2), more = T)
+print (h2, split = c(2, 1, 4, 2), more = T)
+print (h3, split = c(3, 1, 4, 2), more = T)
+print (h4, split = c(4, 1, 4, 2), more = T)
+print (h5, split = c(1, 2, 4, 2), more = T)
+print (h6, split = c(2, 2, 4, 2), more = T)
+print (h7, split = c(3, 2, 4, 2), more = F)
+
+
+rm (h1, h2, h3, h4, h5, h6)
+```
+It looks like everything is slightly better log10 transforming. pH remains relatively left-skewed regardless of transformation.
+
+## Simulate under-sampling of target variable compared to the covariable
+
+# Make subset of the observations of infection load (target variable) and covariables (SVL, mass, and elevation), using every third sample from the full dataset.
+```{r}
+df.inf <- df_pos [seq (1, length (df_pos$avg_inf), by = 3), 
+                   c ("lat", "long", "avg_inf",
+                      "amphibian_svl", "amphibian_weight", 
+                      "ph", "watertemp", 
+                      "conductivity_uS", "totaldissolvedsolid",
+                      "salinity_ppt")]
+str (df.inf)
+
+# look at the selected rows
+rownames(df.inf)
+```
+
+# Add fields with the log10 transformed target and covariables to the dataframe of the subsample
+```{r}
+df.inf <- cbind (df.inf,
+                   log_avg_inf = log10 (df.inf$avg_inf),
+                   log_svl = log10 (df.inf$amphibian_svl),
+                   log_mass = log10 (df.inf$amphibian_weight),
+                   log_ph = log10 (df.inf$ph),
+                   log_temp = log10 (df.inf$watertemp),
+                   log_conduct = log10 (df.inf$conductivity_uS),
+                   log_dissolv = log10 (df.inf$totaldissolvedsolid),
+                   log_salinity = log10 (df.inf$salinity_ppt))
+
+str (df.inf)
+```
+The evaluation dataset is the rows of the dataset that were not used in the subset. We can use this to assess the performance of the interpolation. 
+
+# Set up evaluation dataset: make dataframe of the infection load values at the extra points that were not included in the subsample and compare the descriptive statistics of the 3 sets (sample, extra, and full)
+
+# *** adding a small constant to each avg infection load results in non-normality even after transforming, but non-transforming 0's results in -Inf. May need to 2 separate analyses here like with other stats and Bd -> 1 for positive infections and 0 for negative
+```{r}
+df.extra <- df_pos [setdiff (rownames (df_pos), rownames (df.inf)),
+                      c ("lat", "long", "avg_inf")]
+df.extra <- cbind (df.extra, log_avg_inf = log10 (df.extra$avg_inf))
+
+str (df.extra)
+
+#look at summary stats for full dataset
+summary (log10 (df_pos$avg_inf)); sd (log10 (df_pos$avg_inf))
+
+#look at summary stats for subsample dataset
+summary (df.inf$log_avg_inf); sd (df.inf$log_avg_inf)
+
+#look at summary stats for extra (evaluation) dataset
+summary (df.extra$log_avg_inf); sd (df.extra$log_avg_inf) # evaluation set
+```
+Both the subsample and evaluation (extra) dataset have similar statistics to the full sample. However, the range of the subsample and full dataset are wider than the range of the evaluation dataset. The standard deviation is almost identical across the 3 datasets.
+
+
+# Start the Spatial analysis!
+# convert full and subset dataframes, and interpolation grid (need to create this), to explicitly-spatial, sp classes
+```{r}
+class(df_pos)
+
+coordinates (df_pos) <- c("lat", "long")
+coordinates (df.inf) <- c ("lat", "long")
+coordinates (df.extra) <- c ("lat", "long")
+# coordinates (grid_coord) <- c ("coords.x1", "coords.x2") # already done in interpolation grid chunk
+
+class (df_pos)
+```
+Now the objects (sample locations) are spatially-explicit - have a known bounding box, projection, and attributes
+
+```{r}
+summary (df.inf)
+```
+
+You can also recover the original dataframe if needed like this:
+```{r}
+str (as.data.frame (df_pos))
+```
+
+# Display a postplot of the subsample superimposed on the full sample and compare their geographic distribution
+```{r}
+# this is not returning a plot with any points
+xyplot (lat ~ long, as.data.frame (df_pos), asp = "iso", 
+        panel = function (x, ...) {
+          panel.points (coordinates (df_pos),
+                        cex = 1.8 * (log10 (df_pos$avg_inf) - 1.3),
+                        pch = 1, col = "blue");
+          panel.points (coordinates (df.inf), # subset
+                        cex = 1.8 * (df.inf$log_avg_inf - 1.3),
+                        pch = 20, col = "red");
+          panel.grid (h = -1, v = -1, col = "darkgrey")
+        })
+```
+
