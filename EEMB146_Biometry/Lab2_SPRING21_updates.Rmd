@@ -1,0 +1,225 @@
+---
+title: "Lab2_Sp21"
+author: "sbsambado"
+date: "1/16/2021"
+output: html_document
+---
+
+Lab 2: Introduction to R Markdown and Data Analysis
+
+# 3 common syntax errors
+**spelling** 
++install.packages('readr'), correct
++instal.package('readr') , not correct
+
+**capitilization**
++ install.packages('readr'), correct
++ Install.Packages('readr'), not correct
+
+**punctuation**
++ install.packages('readr'), correct
++ instll_packages('readr'), not correct
+
+
+# R basics
+
+variable <- function(argument)
+
+
+#List of useful functions to create and explore data structure
+* Basic mathematical functions for summary statistics
+    + `sum()`
+    + `mean()`
+    + `min()`
+    + `max()`
+    + `sd()`
+    + `median()`
+    + `summary()`
+    
+* Functions to create & explore data structure 
+    + `c()` - concatenate function
+    + `:` - colon operator for sequence generation
+    + `seq()` - sequence generation
+    + `rep()` - replicate elements of vectors and lists
+    + `View()` - invoke a data viewer
+    + `length()` - length of an object
+    + `class()` - object class
+    + `head()` - return the first 6 rows of an object
+    + `tail()` - return the last last 6 rows an object
+    + `dim()` - returns the dimensions of an object 
+    + `nrow()` - number of rows
+    + `ncol()` - number of columns
+    + `str()` - display the structure of each column of an object
+    + `names()` - display the names of an object, typically the column names
+    + `nlevels()` - categorial levels within an object
+    + `cbind()` - combine objects by columns
+    + `rbind()` - combine objects by rows
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages('readr') # if first time using readr
+## hashtag is making a comment, it is not seen as code
+# annotating your code is great practice! 
+
+#install.packages("readr")
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(knitr)
+
+
+library(ggplot2)
+```
+
+
+#Exercises
+
+```{r}
+# A
+bat_tongues <- read_csv("battongues.csv")
+#View(bat_tongues)
+
+#C
+bat_copy <- bat_tongues
+
+names(bat_copy)
+
+
+# let's change them
+names(bat_copy) <- c("spp", "palate", "tongue")
+names(bat_copy)
+
+# mean of tongue
+mean(bat_copy$tongue)
+
+
+# other stats
+summary(bat_copy$palate)
+
+#### Caffeiene 
+
+caffeine <- read_csv("caffeine.csv")
+names(caffeine) <- c("brand", "caffeine_mg")
+
+
+# basic stats
+var(caffeine$caffeine_mg)
+mean(caffeine$caffeine_mg)
+max(caffeine$caffeine_mg)
+min(caffeine$caffeine_mg)
+sd(caffeine$caffeine_mg)
+median(caffeine$caffeine_mg)
+range(caffeine$caffeine_mg)
+quantile(caffeine$caffeine_mg)
+
+# or just run summary()
+summary(caffeine$caffeine_mg)
+
+# how to analyze categorical data
+table(caffeine)
+table(caffeine$brand)
+
+# plot it!
+
+# HINT: The basics of ggpploting
+# ggplot(data = DATA, aes(x = INDEPENDENT VARIABLE, y = DEPENDENT VARIABLE)) +
+# geom_point()+
+
+ggplot(data = caffeine, aes(x = brand, y = caffeine_mg)) +
+  geom_histogram(stat = "identity") +
+  theme_minimal()+
+  theme(axis.text.x.bottom =  element_text(size = 8, angle = 90))
+  
+
+
+```
+
+#Homework
+
+FOR SPRING OF 2021 RESHAPE THE HOMEWORK QUESTIONS TO GET STUDENTS THINKING MORE ABOUT STRUCTURE OF DATA VS TRYING TO FIND COMMANDS
+**Question 1.**
+```{r}
+# load in required data
+mammal <- read_csv("mammals.csv")
+
+# let's look at file
+#View(DATAFRAME)
+
+# names(DATAFRAME) <- c("COLUMN1NAME", "COLUMN2NAME", "COLUMN3NAME")
+
+# A. Which mammal has the largest brain size:body ratio?
+
+  # make new variable column
+  # DATAFRAME$VARIABLE <- DATAFRAME$VARIABLE1 / DATAFRAME$VARIABLE2
+
+  # find max ratio
+# DATAFRAME[which.max(DATAFRAME$VARIABLE),]
+
+
+# B. Which mammal has the smallest ratio?
+# DATAFRAME[which.mIN(DATAFRAME$VARIABLE),]
+
+# C. What is the mean brain size:body ratio? Are humans above or below the mean?
+# mean(DATAFRAME$VARIABLE)
+
+# find human ratio
+
+# Option 1 (prefered)
+# DATAFRAME[DATAFRAME$VARIABLE == "OBJECT",]
+
+# Option 2
+# DATAFRAME[DATAFRAME$VARIABLE == "OBJECT", "SPECIFICVALUE_OF_OBJECT"]
+
+
+```
+
+
+
+**Question 2**
+```{r}
+# load data
+
+birds <- read_csv("desert_birds.csv")
+#View(birds)
+
+# A. How many desert bird species are rare (<= 10 counts)
+
+# make subset
+
+# VARIABLE_NAME <- subset(DATAFRAME, VARIABLE <= 10)
+#find how many rows there are in subset
+
+# Option 1. Look at length of vector
+
+#length(DATAFRAME$VARIABLE)
+#dim(DATAFRAME)
+#nrow(DATAFRAME)
+
+# Option 2. Look at dataset summary
+#print(DATAFRAME)
+#summary(DATAFRAME)
+
+# This is different than finding the total sum of birds within these rare species
+#sum(DATAFRAME$VARIABLE)
+```
+
+**Question 3**
+```{r}
+
+# load data
+endangered <- read_csv("endangered.csv")
+
+#View(endangered)
+
+# A. What proportion of endangered species are vertebrates?
+
+# Option 1
+
+# VARIABLE_NAME <- subset(DATAFRAME, VARIABLE == "yes")
+# sum(DATAFRAME1$VARIABLE) / sum(DATAFRAME2$VARIABLE)
+
+
+
+```

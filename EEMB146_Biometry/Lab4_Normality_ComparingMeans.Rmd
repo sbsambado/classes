@@ -1,0 +1,461 @@
+---
+title: "Lab4: Normality & Comparing Means"
+author: "Tatum Katz, Sam Sambado"
+date: "1/24/2021"
+output: html_document
+---
+
+Biometry, EEMB 146, Week 4  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries needed for this lab
+#remember to install.packages("package") first and then call library if it's a new package
+library(readr)
+library(tidyverse)
+library(ggplot2) # ifyou want to make fancy plots
+library(car) # new package alert!
+
+# data needed for this lab
+titanic <- read_csv("titanic.csv")
+dexterity <- read_csv("dexterity.csv")
+bumpus <- read_csv("bumpus.csv")
+```
+
+
+# BACKGROUND
+
+## 1. Getting started 
+
+All of the datasets you need for this tutorial and your exercises are included in the Lab 4 folder on Gauchospace. The *homework* for you to turn in are at the end of this tutorial. **Please only turn in homework questions 1-2. Do not include the exercises, or anything else, in your homework file this week.** It is highly recommend that you take the time to read the background for this lab and understand it because these concepts and exercises will be a major portion of your final project.
+
+Here is what you need to do to get started:
+
+- Create an R project for lab 4. This will create a folder for lab 4 that you will fill with all of the data and files for this week's lab:
+  - In R Studio, click *File - New Project*
+  - A "New Project Wizard" will pop up:
+  - Select **New Directory** then **New Project**
+  - Name your project *lab_4* or something similar and choose a location to store this
+  - A new folder should appear named *lab_4* and it will contain a file called *lab_4.Rproj*.If you close R Studio, you can re-enter this project by clicking on that file
+- Save all the files for Lab 4 in your *lab_4* folder.
+
+
+## 2. Motivation for this lab
+\n
+When we do statistical tests in ecology we often are comparing the means between two or more samples after accounting for any number of factors or covariates.
+
+For example, think about the plant data from Lab 3. One potential question is: Are mean dandelion rosette diameters significantly different at 3m from the habitat edge compared to 0m? What about 6m compared to 0m?
+
+
+In both these cases we are interested in the sample means. Therefore, we need to be concerned about the distribution of these sample means. **By making a histogram of these means we could determine their distribution**. If this distribution was normal, we could apply many of the standard statistical tests to our dataset, which have high statistical power (i.e. low Type II error). If this distribution was non-normal we would have to either transform our data or use non-parametric statistics, which would lower our statistical power.
+
+
+This is really important in ecology because often our data is far from normal. Based on the Central Limit Theorem, we should be able to use standard statistical tests if our sample size is large enough. In this lab we will learn how to determine if our distributions are normal and then apply the appropriate statistical tests to compare means. 
+
+## 3. Determine normality of data
+
+### 3.1 Visually with histograms, boxplots, or qqPlots (~new skill alert~)
+
+#### 3.1.1 Visualize with histograms
+```{r how to visualize normality with histogram}
+
+# Make fake data to visualize
+norm_samp = rnorm(1000, mean=21 , sd=3) #normal distribution 
+exp_samp = rexp(1000) #exponential distribution 
+
+# Visualization with a Histogram
+hist(norm_samp,
+     breaks=20, #20 bins is more practical, even though our sample size is 10x bigger. You get a sense of how many fall within bins that have a width that makes sense. This normal variable could be "age" for example 
+     col='darkgray',
+     ylab="Frequency",
+     main="Histogram of Normally Distributed Data") 
+
+hist(exp_samp,
+     breaks=20, #20 bins is more practical, even though our sample size is 10x bigger. You get a sense of how many fall within bins that have a width that makes sense. This normal variable could be "age" for example 
+     col='purple',
+     ylab="Frequency",
+     main="Histogram of Non-Normally Distributed Data") 
+
+titantic <- read_csv("titanic.csv")
+names(titanic)
+
+ggplot(data = titanic, aes(x = Survive, y = Age)) +
+  geom_point(fill = "red", size = 6, color = "red") +
+  theme_classic()
+
+
+```
+
+The `norm_samp` data looks normally distributed
+The `exp_samp` data does not look normally distributed
+
+#### 3.1.2 Visualize with qqPlots
+```{r visualize normality with qqplot}
+
+# Visualization with a qqPlot
+#install.packages("car") 
+#install car package. only run once on each computer. when you knit, #comment this line out
+library(car)#load car package
+
+# Now we’ll generate a qqplot using qqPlot function in car package.
+
+qqplot() # wrong
+qqp() # wrong
+qqPlot(norm_samp, main = "title") # right
+
+par(mfrow = c(1,1) )
+qqPlot(norm_samp, main = "qqPlot of Normally Distributed Data") #qqplot function
+qqPlot(exp_samp, main = "qqPlot of Non-Normally Distributed Data") #qqplot function
+
+
+
+```
+
+For a qqplot, if all of your data points fall in between the dashed confidence bands you can be pretty confident that your data follow a normal distribution.
+
+For `norm_samp`, most data points (circles) fall within the confidence bands, so data is normally distributed. Althought you can see data point 199 and data point 191 are close to being outliers (i.e. fall outside of dashed confident lines)
+
+For `exp_samp`, most data points (circles) fall outside the confidence bands, so data is not normally distributed. There are clear outlier data such as data points 268 and 744.
+
+
+
+### 3.2 Quantitatively with Shapiro-Wilk Test for Normality
+
+**The null hypothesis of this test is that your data are normally distributed.** The alternative hypothesis of this test is that your data are not normally distributed. Therefore, if this test gives us a p-value that is non-significant (i.e. p > 0.05) we can be reasonably confident that our data are normal.
+
+p < 0.05 you can reject the null
+p > 0.05 you fail to reject the null
+
+Exampl 1. Let’s use the Shapiro-Wilk test to see if norm_samp is a normal distribution:
+```{r how to quantitatively test for normality}
+# EXAMPLE 1
+shapiro.test(norm_samp) #run a shapiro-wilk test on norm_samp
+
+# How to interpret shapiro test results
+  # 1. state your p-value: p-value = 0.6271 (your p-value may be different, but it should be above p > 0.05)
+  # 2. compare your p-value to significant p-value value: 0.7614 > 0.05
+  # 3. look at your null hypothesis: data are normally distributed
+  # 4. contextualize: My p-value of the shapiro-wlk test is 0.76, which is above a p-value of 0.05, hence I can be resaonably confident that my data   are normal
+
+# remember p > 0.05 means you fail to reject the null hypothesis based on your data and tests
+
+
+## This shapiro-wilk value makes sense since my histogram and qqPlot looked normally distributed
+
+```
+
+Example 2. Let’s use the Shapiro-Wilk test to see if exp_samp is a normal distribution:
+
+```{r}
+
+# EXAMPLE 2
+shapiro.test(exp_samp) #run a shapiro-wilk test on exp_samp
+
+# How to interpret shapiro test results
+  # 1. state your p-value: p-value < 2.2e-16 (your p-value may be different, but it should be below p < 0.05)
+  # 2. compare your p-value to significant p-value value: 2.2e-16 < 0.05
+  # 3. look at your null hypothesis: data are normally distributed
+  # 4. contextualize: My p-value of the shapiro-wlk test is 2.2e-16, which is below a p-value of 0.05, hence I can be reasonably confident that my data are not normal
+
+# remember p < 0.05 means you reject the null hypothesis based on your data and tests
+
+
+## This shapiro-wilk value makes sense since my histogram and qqPlot looked not normally distributed
+
+
+```
+
+
+**Once we have determined if our data are normal, then we can compare means of our data**
+
+
+## 4. Review of comparing means  
+  
+#### 4.1 One sample t-test  
+  
+When we want to ask a question about the mean of a sample, but we do not know the true variance of the population (i.e. we have to estimate the variance from the sample) we need to use a one sample t-test. The one-sample t-test has the following assumptions:  
+  
+1. Assumes the random variable (e.g. beak width, kelp height, etc.) has a *normal distribution*  
+2. Assumes that the observations represent a *random sample* from the population  
+  
+The hypotheses for a two-sided one sample t-test are: 
+  
+$H_0 : \mu = a$  
+$H_A : \mu \neq a$  
+  
+where $a$ is your hypothezied mean.  
+  
+To test these hypotheses, calculate a t statistic using the following formula:  
+  
+$t = \frac{\bar Y - a}{s/\sqrt{n}}$  
+  
+where $s$ is the standard deviation of your sample and n is your sample size.  
+  
+The resulting t-statistic has $n-1$ degrees of freedom (df). You can test your null hypothesis in three different ways:   
+  
+1. Get the critical t-value $(t_{\alpha(2)})$ with $n-1$ df for $\alpha = 0.05$ and compare it to your calculated t-value. Reject your null hypothesis if the absolute value of your t-value is greater than the absolute value or the critical t-value.  
+2. Calculate the 95% confidence interval with the equation $\bar Y \pm t_{\alpha(2),df}SE_{\bar Y}$ and determine if $a$ (your hypothesized mean) i sin the interval. Reject your null hypothesis if $a$ is not in the 95% CI.    
+3. Find the p-value associated with your critical t-value (via R or a t-table with $n-1$ df) and determine if it is less than your predetermined $\alpha$. Reject $H_0$ if $p<\alpha$  
+
+R code
+```{r one sample t-test}
+# t.test(DATASET$VARIABLE, mu=MEAN) 
+
+```
+
+#### 4.2 Paired t-test  
+  
+If you want to compare the means between two groups and each data point in one group is uniquely paired with a data point in another group you can use the paired t-test. Take the difference between each pair of data points and then perform a one sample t-test with $H_0 : \mu_d = 0$. Assumptions:  
+  
+1. Assumes that the observations from each group represent a *random sample* from the population.  
+2. Assumes that the *difference* of the two observations follow a *normal distribution*.  
+
+R code
+```{r paired- t-test}
+
+# first make 
+# t.test(GROUP1, GROUP2, paired = TRUE)
+
+t.test(weak, dominant, paired = TRUE)
+
+```
+
+#### 4.3 Two-sample t-test  
+  
+The two-sample t-test compares whether the means of two groups are significantly different form each other. This test has the following assumptions:  
+  
+1. Assumes that the observations from *each group* represent a *random sample* from the population.  
+2. Assumes that the observations follow a *normal distribution*.  
+3. Assumes that the observations from the two groups have *the same variance*.    
+  
+If we have two groups called group 1 and group 2, the two-sided hypothes for the two-sample t-test are:  
+  
+$H_0 : \mu_1 = \mu_2$  
+$H_A : \mu_1 \neq \mu_2$  
+  
+Before we can test these hypotheses we need to ensure that our assumptions are met. You can test the normality assumption using any of the procedures that you already know (e.g. qqplots or the Shapiro Wilk statistic). To test the homogeneity (equal) of variance assumption we will use something called *Levene's Test*. The *null hypothesis* of the Levene's test is that the variance between the two groups are equal. The *alternative hypothesis* is that they are not equal.  
+If we fail to reject the *null hypothesis* of the Levene's test we can pool our variances and use a standard two-sample t-test. We would compute this t statistic using the following equations:  
+  
+$SE_{\bar Y_1 - \bar Y_2} = \sqrt{s^2_p(\frac{1}{n_1}+\frac{1}{n_2})}$  
+  
+where  
+  
+$s^2_p = \frac{df_1s^2_1+df_2s^2_2}{df_1+df_2}$  
+  
+is the pooled sample variance (described in your book). With these equations we can calculate the t statistic:  
+  
+$t = \frac{\bar Y_1 - \bar Y_2}{SE_{\bar Y_1 - \bar Y_2}}$  
+  
+where this t statistic has a df of $n_1 + n_2 - 2$.  
+  
+If we reject the *null hypothesis* of the Levene's test we use something called *Welch's t-test*. We calculate the t statistic with a similar equation as equation 7, but the denominator is changed to account for the different variances between the two groups. Moreover, the df is also calculated a bit differently. For the most part, you can ignore these technicalities. You just need to understand that a different test is used when between group variances are unequal. If possible, we would prefer our two groups to have equal variance because our statistical test will have more power.  
+Similar to the one-sample t-test, you can draw conclusions using one of the equivalent methods:  
+  
+1. Get the critical t-value $(t_{\alpha(2)})$ with $n_1 + n_2 - 2$ df (assuming equal variance) for $\alpha = 0.05$ and compare it to your calculated t-value. Reject your null hypothesis if your absolute value of your t-value is greater than the absolute value of the critical t-value.  
+2. Calculate the 5% confidence interval via the equation $\bar Y_1 - \bar Y_2 \pm SE_{\bar Y_1 - \bar Y_2}t_{\alpha(2),df}$ and determine if 0 is in the interval. Reject your null hypothesis if 0 is not in the 95% CI.  
+3. Calculate the p-value associated with your calculated t-value (via R) and determine if it is less than your predetermined $\alpha$. Reject $H_0$ if $p<\alpha$.  
+
+
+R code
+```{r}
+# Two-sampled t-test with unequal variances using the Welch's t-test
+# t.test(GROUP1$VARIABLE, GROUP2$VARIABLE, var.equal = FALSE)
+
+# One-sided test: Mean is significantly less of Group 1 than mean of Group 2
+# t.test(GROUP1$VARIABLE, GROUP2$VARIABLE, alternative = "less, var.equal = FALSE)
+```
+
+**Resources for more organized and visually appealing Rmarkdown documents**
+
++ Rmarkdown guide slides
+https://commonmark.org/help/tutorial/02-emphasis.html
+
++ Rmarkdown cookbook
+https://bookdown.org/yihui/rmarkdown-cookbook/
+
+# EXERCISES
+
+### A. One sample t-test  
+  
+Let's go through an example of how to run a one-sample t-test in R. Load in the dataset *titanic.csv*.  
+```{r}
+titanic <- read_csv("titanic.csv") # load dataset in
+dim(titanic) # 7 variables, 1313 observations
+
+#View(titanic) # let's look at dataset
+
+```  
+This data contains the names, sexes, ages, and fates of all the passengers on the Titanic (search for Jake and Rose if you would like!). We want to ask the following question: *Is the average age of passengers on the Titanic significantly different than 18 years old?*  
+  
+Let's perform the following steps:  
+  
+1. Visualize the data. This should always be the first step in data analysis. Make a histogram of all the passenger's ages. Remember this is what is referred to as *exploratory data analysis* or EDA. We need to visually check what the data look like!  
+```{r}
+
+# HINT: hist(DATASET$VARIABLE, xlab = "TITLE", main = "TITLE")
+
+
+# can make this more ~fancy~ tho
+```  
+  
+2. Check the assumptions of the single sample t-test: (1) are the data a random sample? and (2) are the ages normally distributed? 
++ We can check (2) using the skills we learned last week (Shapiro-Wilk, $p<0.05$). However, the central limit theorem tells us that the distribution of sample means from 633 observations will be normal (test if you would like), so we are justified using the one sample t-test.  
+```{r}
+# HINT: shapiro.test(DATASET$VARIABLEOFINTEREST)
+
+```
+  
+3. Specify $H_0 : \mu = 18$ and $H_A : \mu \neq 18$ 
+
+In words: 
+The null hypothesis is that the mean age of passengers on the titanic are 18.
+The alternative hypothesis is that the mean age of passengers on the titanic are not 18.
+
+*remember: p < 0.05 we reject the null hypothesis, p > 0.05 we fail to reject the null hypothesis*
+
+4. Perform the t-test using R.  
+```{r} 
+# the one-sample t-test. modify the code for your variables!
+# HINT: t.test(DATASET$VARIABLE, mu=MEAN AGE) # self-check: why mu = 18?
+
+t.test(titanic$Age, mu = 18)
+
+```  
+
+From this information we can reject our $H_0$ using three equivalent methods:  
+   (1) Get the **critical two-sided t-value** for $\alpha = 0.05$ and $df = 632$:  
+```{r}
+# getting the critical two-sided t-value for alpha = 0.05 and df = 632
+qt(0.025, 632) # self-check: why 0.025 and not 0.05?
+```  
+   You should see the absolute value is 1.9637. This is less than the absolute value of our calculated t-value (22.5095), so we can reject our null hypothesis at $\alpha=0.05$.  
+   
+   (2) Look at the **95% confidence interval** generated from the single-sample t-test. Because this interval does not include 18 we can reject our null hypothesis at $\alpha=0.05$.  
+   
+   (3) Our exact **p-value** is $p<2.22e^{-16}$ which tells us the probability of getting a result as extreme or more extreme than $\bar Y = 31.19$ years old under our null hypothesis that $\mu = 18$. We can reject our null hypothesis on this critera.  
+  
+We can conclude that the mean age of passengers on the Titanic was significantly greater than 18 years old!  
+  
+### B. Two sample t-test  
+  
+Women and children first?! That was the societal norm when the Titanic sank. Therefore, we might expect a *difference in age between passengers that survived and those that did not*. We can test this using a two-sample t-test and the following procedure:  
+  
+1. Visualize the data. Make a boxplot of age versus survival:  
+```{r}
+# your code here to make a boxplot
+
+# survive is a non-numeric value, so boxplot is more appropriate than a histogram
+# HINT: boxplot(Y ~ X, data = DATASET)
+
+names(titanic)
+boxplot(Age ~ Survive, data = titanic)
+
+```  
+  
+2. Check the assumptions of the two sample t-test:
+    + Check the assumption of normality to verify that each group is normally distributed. To do this, look at the boxplot. The median appears to be in the center for both boxes indicating the data is probably normal. We could also check with a qqPlot and the Shapiro-Wilk test:  
+```{r}
+# Q-Q plot separated by group (surviving, yes or no). CHANGE THE VARIABLE NAMES IF NEEDED~!
+library(car) # load the package before you use it
+
+# Visualize
+
+# HINT: with(DATASET, qqPlot(RESPONSEVARIABLE[GROUPVARIABLE == "no"],))
+
+dim(titanic)   
+with(titanic, qqPlot(Age[Survive == "no"],)) # did you name titanic.csv "titanic"? if not, change it here
+with(titanic, qqPlot(Age[Survive == "yes"],)) # did you name titanic.csv "titanic"? if not, change it here
+
+# Quantify
+# Shapiro-Wilk test
+# HINT: with(DATASET, shapiro.test(RESPONSEVARIABLE[GROUPVARIABLE == "no"]))
+with(titanic, shapiro.test(Age[Survive == "yes"]))
+with(titanic, shapiro.test(Age[Survive == "no"]))
+```  
+   
+Check if each group has the same variance using the **Levene's Test**: 
+
+Remember: The *null hypothesis* of the Levene's test is that the variance between the two groups are equal. The *alternative hypothesis* is that they are not equal.  
+
+If p < 0.05 we reject the null hypothesis, if p > 0.05 we fail to reject the null hypothesis
+```{r}
+# Levene's test: response variable, group variable
+
+leveneTest(titanic$Age, titanic$Survive)
+
+leveneTest(titanic$Age, titanic$Survive)
+
+leveneTest(titanic$Age, titanic$Survive)
+```  
+Notice that $p=0.02407$. We therefore reject our null hypothesis that the variances are equal.  
+  
+3. Specify 
+$H_0 : \mu_{survive} = \mu_{casualty}$ OR $H_0 : \mu_{survive} - \mu_{casualty} = 0$ 
+
+      AND $H_A : \mu_{survive} \neq \mu_{casualty}$ OR $H_A : \mu_{survive} - \mu_{casualty} \neq 0$   
+  
+4. Use R to perform a two-sample t-test with unequal variances using the **Welch's t-test**:  
+```{r}
+# two-sample t-test with unequal variances (Welch's two-sample t-test)
+
+#first, you have to subset the two groups
+lived <- subset(titanic, Survive=="yes")
+died <- subset(titanic, Survive=="no")
+
+#now, run the t-test on those groups
+t.test(lived$Age, died$Age, var.equal = FALSE) # note that 95% CI and a two-sided hypothesis are default settings, meaning we don't have to set them here!
+```  
+
+Based on the output above, we see that $p=0.04655$ is less than $p=0.05$ and our 95% CI does not contain 0. Therefore, we can reject our null hypothesis and say that there is in fact a significant difference between the means.  
+
+If we want to test, say, that the mean age of the survivors is significantly *less* than the mean age of the casualties, we could run a one-sided test:  
+```{r}
+t.test(lived$Age, died$Age, alternative="less", var.equal = FALSE) # here, we specify the one-sided "less" hypothesis, since two-sided is the default setting and we want to override that.
+```  
+Now, we find that there is a statistical difference in the age of survivors - *the survivors were statistically younger than those that died*.  
+  
+
+  
+# HOMEWORK
+
+All homework questions are due next Wednesday before noon. Use R Markdown to turn in all your exercises and upload the necessary code and answers either an an HTML or PDF file to Gauchospace. Answers must be in complete sentences and quantitative numbers supporting your qualitative assessment need to be reported. For all exercises, alpha = 0.05.  
+
+*Remember*
+
++ Always state your null and alternative hypothesis
++ Visualize with histogram/boxplot
++ Visualize with qqPlot
++ Run Shapiro-Wilk Test
++ Run the appropriate t-test
+
+**Question 1: Dominant hand vs/ weak hand dexterity**  
+  
+Use a **paired t-test** to answer the following question: *Does writing the phrase "The search for truth" take a different amount of time with your weak v. dominant hand?*. Specifically, read the section `4.2 Paired t-test` carefully andinclude the following information in your homework, along will all necessary code:  
+  
+a. Clearly *state* your null and alternative hypotheses of your paired t-test.  
+
+b. Visualize your data in a meaningful way. 
+
+c. Determine if the data are normally distributed and, if not, whether you think the Central Limit Theorem will allow you to use a statistical test that assumes normality. Include both a qqPlot and a Shapiro-Wilk statistic.  
+    + Hint: to do this you will need to **create a new variable** that is the difference between each person's weak hand and dominant hand and test whether this new variable is normally distributed using a qqPlot and a Shapiro-Wilk test.  
+  
+
+d. Regardless of whether or not you think the assumptions of the t-test hold, *report* the 95% confidence interval for the paired t-test. Use the 95% CI to reject or fail to reject your null hypothesis. Be specific as to why you do one or the other and *state* your conclusions about the dominant v. weak hand dexterity.
+
+**Question 2: Natural selection in birds**  
+  
+In 1898, Hermon Bumpus collected data on one of the first examples of natural selection directly observed in nature. Immediately following a bad winter storm, 136 English house sparrows were collected and brought indoors. Of these, 72 subsequently recovered, but 64 died :(. Bumpus made several measurements on all of the birds, and he was able to demonstrate strong natural selection on some of the traits as a result of this storm!  
+Bumpus published all of his data, and you can find them in the file *bumpus.csv*. Test whether the birds that *survived or died* (survival) differeed in *total length* (total_length_mm). Specifically, include the following in your homework, along with all necessary code:  
+
+a. Clearly *state* your null and alternative hypotheses of your **two-sample t-test**.  
+
+b. Visualize your data in some meaningful way, and *explain* what information you get from the visualization. Include this plot in your report.  
+
+c. Check whether the normality assumption is valid for the two-sample t-test using the procedure described earlier. Include the Shapiro-Wilk p-value and the qqPlot and *explain* whether or not the normality assumption is valid.  
+
+d. Test whether the trait has equal variance between dead and alive birds using a Levene's Test. *Report* the results of your Levene's test. Based on the results, *state* whether the groups have equal or unequal variances.  
+
+e. Perform the appropriate two-sample t-test and display your results. Clearly *state* your conclusion from the two-sample t-test in terms of how the trait affects a bird's survival during winter storms.  
+  

@@ -1,0 +1,446 @@
+---
+title: "Lab3_DataVisualization"
+author: "Tatum Katz, Jacob Weverka, Sam Sambado"
+date: "1/16/2021"
+output: html_document
+---
+
+# BACKGROUND
+
+## 1. Getting Started
+
+All of the datasets you need for this tutorial and your exercises are included in the Lab 3 folder on Gauchospace. The *homework* for you to turn in are at the end of this tutorial. **Please only turn in homework questions 1-3. Do not include the exercises, or anything else, in your homework file this week.**
+
+Here is what you need to do to get started:
+
+- Create an R project for lab 3. This will create a folder for lab 3 that you will fill with all of the data and files for this week's lab:
+  - In R Studio, click *File - New Project*
+  - A "New Project Wizard" will pop up:
+  - Select **New Directory** then **New Project**
+  - Name your project *lab_3* or something similar and choose a location to store this
+  - A new folder should appear named *lab_3* and it will contain a file called *lab_3.Rproj*.If you close R Studio, you can re-enter this project by clicking on that file
+- Save all the files for Lab 3 in your *lab_3* folder.
+
+**Resources for a more organized work flow**
+
++ RStudio Projects and Working Directories: A Beginner’s Guide
+  + https://martinctc.github.io/blog/rstudio-projects-and-working-directories-a-beginner's-guide/ 
+
++ Learning R Resources
+  + https://waiteh221.wixsite.com/heidiwaite/post/learning-r-resources 
+
+
+# EXERCISE
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE) # keep this TRUE so we can see your code when you knit!
+
+# install and call neccessary libraries
+
+library(readr)
+library(ggplot2) # you will need to first install this if this is your first time using ggplot2 package
+
+```
+
+## 2. Plotting in R
+
+You can spend hours making pretty plots in R. When you are publishing papers you may want to do just that. In this class, we are not going to worry about publication quality figures, but we are going to learn how to make figures that tell you and anyone exactly what the data are showing. This tutorial will show you some examples of making figures in R. There is no way a tutorial can tell you everything you need to know about plotting in R, so we are just going to cover the basics. I would recommend playing around with some of the code as you work through this tutorial.
+
+Also, if you have a question about how to make certain plots check out gallery websites like http://r-graph-gallery.com/. Websites like these give you examples of how to make plots in R with all of the code included! If you get really excited about plotting in R, check out the package ggplot2. It is fast becoming the default plotting package in R.
+
+
+**2.1 Useful functions for plotting in base R.**
+Here are a list of useful functions for making plots in R. By using the ? in R you can figure out the details of these different plotting functions.
+
+1. plot() : Plot x and y against each other
+2. hist() : Make a histogram of your data
+3. scatterplot() : Make a scatter plot of x and y
+4. abline() : Add a straight line to your current plot
+5. lines() : Add more lines/data to your current plot
+6. curve() : Plot a function over some range
+7. boxplot() : Make a box plot to compare different groups of your data 8. densityPlot() : Fit a density kernel to your data
+9. pie() : Make a pie chart
+10. barplot() : Make a bar graph in R 11. mosaicplot() : Make a mosaic plot
+
+
+**2.2 Some plotting examples.**
+Let’s use R to reproduce a couple of the figures given in the book. Let’s start off with figure 2.5-1. We are trying to determine whether the ornamentation of a father guppy correlates to the attractiveness of his son. 
+
+*Example 1*
+\n
+
+We need to first read in the guppies csv file, use read.csv( ) to do this and give the dataframe the name guppies.
+\n
+
+**Base plot and ggplot plots**
+
+```{r}
+##read in the data file
+guppies <- read_csv("guppies.csv")
+
+```
+
+Great! After you read in data you should get a sense of what it looks like, do this by viewing the data, printing it, or you can use the *head()* function to see the column names and the first 10 rows of data. This is enough for you to know the variables and type of data you're working with.
+
+```{r}
+#gets the top few rows of data
+head(guppies)
+```
+
+Now lets make let's make a scatter plot of father’s ornamentation vs the son’s attractiveness to see if father and son attractiveness correlates. Run the code below to see the graph.
+
+
+```{r}
+
+#The structure of a bare bones base plots:
+# plot(DATAFRAME$X_VARIABLE, DATAFRAME$Y_VARIABLE,
+# xlab = "TITLE OF X AXIS", ylab = "TITLE OF Y AXIS")
+
+plot(guppies$father.ornament, guppies$son.attract, xlab="Father's ornamentation", ylab="Son's Attractiveness", col="red", pch=19, ylim=c(-0.5, 1.5))
+```  
+
+A couple of notes. First notice that we set the *father.ornament* variable as the x-axis and the *son.attract* variable as the y-axis.  We then set the labels of these axes using *xlab* and *ylab*.  We specify the color of the points using *col* and the limit of the y-axisusing *ylim* (remember the c() container?). The *pch* specifies the type of point we want For example, try changing the code below so that pch = 2 and see how the symbols change! (You can also try out other values for pch to see more options!)
+
+```{r}
+plot(guppies$father.ornament, guppies$son.attract, xlab="Father's ornamentation", ylab="Son's Attractiveness", col="red", pch=2, ylim=c(-0.5, 1.5))
+```
+
+\n
+
+
+We just saw how to make a scatterplot using base R. Another popular way to make graphs is using a package called **ggplot2**. This package offers lots of options for customizing graphs and figures - see the [ggplot 2 Cheat](https://rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf). The basic format of code in ggplot is always the same: we start by using the ggplot function to specify what data to use, and which variable to put on which axis. Then, we add on a "geom" using the plus sign to specify what kind of plot we want. There are a ton of other functions that can be added from there to customize the plot. Here is an example of the same plot we just made, but now in ggplot2.
+
+```{r}
+# install.packages("ggplot2")
+library(ggplot2)
+
+ggplot(data = guppies, mapping = aes(x = father.ornament, y = son.attract)) +
+  geom_point(color = "red") +
+  xlab("Father Ornamentation") +
+  ylab("Son Attractiveness") +
+  theme_bw()
+  
+
+
+```
+
+
+Both base plotting and ggplot2 are valid and useful ways to visualize data, so feel free to use whichever you prefer!
+
+\n
+\n
+\n
+
+*Example 2*
+\n
+
+Now we're going to create a cumulative density plot of the species abundance distribution of desert birds. But first you need to read in the desert_birds.csv file, assign it the name birds.
+\n
+
+**Cumulative density plot**
+```{r}
+#read in data
+birds <- read.csv("desert_birds.csv")
+```
+
+We're going to take a random normal sample that is the length of the Count column in birds dataframe and has the same mean and standard deviation (sd). 
+
+```{r message=FALSE} 
+#generates simulated data using our birds dataset
+norm_data<-rnorm(length(birds$Count), mean=mean(birds$Count), sd=sd(birds$Count))
+
+#make an empirical CDF of birds
+emp_cdf <- ecdf(birds$Count)
+
+#Make a CDF of the normal sample
+norm_cdf<-ecdf(norm_data)
+
+#Plot the bird CDF
+plot(emp_cdf, col="red", main="CDF of Bird Counts Compared to Normal Distribution", 
+     xlab="Count", ylab="Cumulative relative frequency")+
+  # Use lines to add more lines to the given plot
+  lines(norm_cdf)
+  #Add a legend 
+  legend(400, .2, c("Birds", "Normal Distribution"), col=c("red", "black"), pch=c(19,19))
+```
+
+\n
+
+The function lines() allows you to put multiple lines on the same plot; it can be really useful.
+
+Notice that this plot gives us a pretty good idea that the distribution of desert bird counts is not approximated by a normal distribution. Keep in mind that it can’t be exactly normal because counts are discrete and can’t be less than 1 (you don’t count birds that you don’t find).
+
+\n
+
+Here's code to make the same plot using ggplot:
+
+```{r}
+ggplot(birds, aes(x = Count)) +
+  stat_ecdf()
+```
+
+*Example 3*
+\n
+
+We're going to use the lynx_data.csv file now, read it into R as lynx
+\n
+
+**Making a Line Plot**
+\n
+```{r}
+#read in the lynx data
+lynx <- read.csv("lynx_data.csv")
+```
+
+The lynx data has the number of pelts collected per year, lets plot that to see how it changes over time.
+
+```{r}
+plot(lynx$date, lynx$no.pelts, pch=19, xlab="Year", ylab="Number of Pelts")+
+  lines(lynx$date, lynx$no.pelts)
+
+#another method to make this plot
+plot(no.pelts~date,data=lynx,pch=16,type="b", xlab="Date",ylab="Number of pelts")
+```  
+
+You'll see we use the function plot() and inside the function we put first the independent variable (X) Year and then the dependent Y variable no.pelts.  We added lines so it was easier to see the pattern over time. 
+\n
+
+Let's try this same plot using ggplot. This time we can add both `geom_point()` and `geom_line()`:
+```{r}
+ggplot(lynx, aes(x = date, y = no.pelts)) +
+  geom_line() +
+  geom_point()
+```
+
+*Example 4*
+\n
+
+You are going to make some plots of the plant data that you collected during the first week of lab. Remember our question: Are plant communities along the habitat edge different than plant communities that are not on the edge?.
+Load the data plant_data.csv into R. Spend some time looking at the data, call it plant. 
+\n
+
+**Visualizing your plant data**
+\n
+
+```{r}
+#read in plant_data.csv file
+plant <- read.csv("plant_data.csv")
+```  
+
+View and explore your data
+```{r}
+head(plant)
+names(plant) #look at the variables
+summary(plant) #run some basic summary statistics
+str(plant) #look at data structure, what types of variables you are dealing with
+dim(plant) #what are the dimensions of the data
+```
+
+
+The variables in the data are:
+    
+    1. tran_number : A unique number for each transect.
+
+    2. sp_richness : Species richness in a quadrat
+
+    3. percent_cover : Percent of quadrat that is not bare ground
+
+    4. dist_from_edge_m : Distance of the quadrat from the habitat edge in meters
+
+    5. dist_from_tree_m : Distance of the quadrat from the nearest tree in meters/steps
+
+    6. day_of_week : The day of week the data was collected. Has values of Monday through Thursday
+
+    7. num_flowers: The number of flowers in a quadrat
+
+    8. num_dand_flowers: Number of dandelion flowers in a quadrat
+    
+    9. num_leaves_in_rossette: Number of leaves in a dandelion rosette for each dandelion in a quadrat
+
+    10. dand_rosette_diam_cm: The diameter of each dandelion rosette in cm for each dandelion in a quadrat.
+    
+    
+# Exercise 1: Distributions 
+\n
+
+*do not include in your homework file*
+
+Now you're going to make a histogram of the num_leaves_in_rosette and dand_rosette varaibles. We'll use the hist() function.  
+
+```{r}
+?hist #explore what you can do with the hist() function
+hist(plant$num_leaves_in_rosette)
+#changing the number of 'breaks' will give you more/fewer bins - play around with this
+hist(plant$num_leaves_in_rosette,breaks=20) 
+hist(plant$num_leaves_in_rosette,breaks=20,col='darkgray',
+     xlab="Number of leaves in rosette", 
+     ylab="Density",
+     main="Histogram of number of leaves in rosette") #add axes labels and title!
+``` 
+
+We see that this distribution is right skewed. 
+
+Let’s now compare the number of dandelion leaves between 0m, 3m, and 6m
+from the habitat edge.
+
+```{r}
+#0m
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="0.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 0m",xlim=c(0,40))
+
+#3m
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="3.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 3m",xlim=c(0,40))
+
+#6m
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="6.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 6m",xlim=c(0,40))
+```  
+
+Notice in the code above how we subset the plant dataset so each graph was a plot of the number of leaves in rosette for plants from 0, 3, or 6 m from the edge. 
+
+Now if we wanted to put all three of these graphs in one plot we could do:
+
+```{r}
+#To make all three histograms into one cool plot
+par(mfrow=c(3,1)) #sets up your plot (3 x 1)
+#then re-run the three plots
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="0.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 0m",xlim=c(0,40))
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="3.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 3m",xlim=c(0,40))
+hist(plant$num_leaves_in_rosette[plant$dist_from_edge_m=="6.0m"],col='darkgray',
+     xlab="Number of leaves in rosette",
+     ylab="Density",main="Histogram of number of leaves in rosette - 6m",xlim=c(0,40))
+
+
+#to switch back to looking at one plot at a time
+par(mfrow=c(1,1))
+```
+
+```{r}
+ggplot(plant, aes(x = num_leaves_in_rosette)) +
+  geom_histogram(bins = 20) +
+  facet_grid(dist_from_edge_m ~ .)
+```
+
+
+
+But what if we instead want to create a boxplot? How does distance from edge of habitat (your explanatory variable) affect number of leaves per rosette (your response variable; what we measured)?
+
+```{r}
+# base R plots
+boxplot(num_leaves_in_rosette~dist_from_edge_m,data=plant,
+        xlab="Distance from edge (m)",
+        ylab="Number of leaves per rosette",col='darkgray')
+```
+
+
+```{r}
+# ggplot plots
+ggplot(plant, aes(x = dist_from_edge_m, y = num_leaves_in_rosette, color = day_of_week)) +
+         geom_boxplot()
+```
+
+# Exercise 2: Transformations
+\n
+
+*do not include in your homework file*
+
+We are now going to try something called a transformation. We often use transformations in data analysis to make our data look more normal. We will cover this in more detail in class, but we want you to get a feel for it here. With your plant dataset as your active dataset,
+```{r}
+#creates a new variable, natural log + 1 (LOG TRANSFORMATION)
+log_num_flowers <- log(plant$num_flowers+1)  
+head(log_num_flowers) #what do the numbers look like
+#if you want to create a new variable AND add it to your dataframe
+plant$log_num_flowers <- log(plant$num_flowers+1) 
+head(plant) #double check that it's there
+
+hist(plant$num_flowers)
+hist(plant$log_num_flowers)
+#to square num fowers
+plant$num_flowers_sq <- plant$num_flowers^2
+```
+
+# Exercise 3: Scatter Plots
+\n
+
+*do not include in your homework file*
+
+We might want to ask whether there is some association with the size of a dandelion rosette and the number of leaves on a dandelion rosette (e.g. do dandelions with larger rosettes have more leaves?). Both of these variables are numerical, so let’s make a scatter plot to answer this question.
+
+```{r}
+plot(num_leaves_in_rosette~dand_rosette_diam_cm,data=plant,
+     xlab="Dandelion rosette diameter (cm)",
+     ylab="Number of leaves in rosette")  #insert y~x
+#alternate code - same result
+plot(plant$num_leaves_in_rosette~plant$dand_rosette_diam_cm) 
+
+#now, you want to overlay a least squares line to get an idea of the trend
+#run linear regression
+fit <- lm(num_leaves_in_rosette~dand_rosette_diam_cm,data=plant)
+abline(fit,col='green') #overlay line on existing plot
+
+```
+
+
+
+# HOMEWORK
+
+## Homework Question 1 
+ 
+Use Exercise 1 to help answer questions on dand_rosette_diam_cm. You should have **1 plot**.
+
++ a) Describe the shape of the dandelion rosette diameter distribution for different distances from the edge.  Are they symmetrical or skewed?
+
++ b) Based on the boxplot you just made, how do the medians and dispersion (aka spread of the data) compare across different distances from the edge? Would you feel confidence concluding that hte distance from the edge has a significant effect on dandelion rosette diameter? 
+
+```{r}
+# library(readr)
+# library(ggplot2)
+
+##### ALL CODE NESCESSARY TO ANSWER HOMEWORK QUESTION 1 
+
+```
+[your text answer to question 1 here]
+
+
+
+## Homework Question 2 
+Follow the procedure that we used in Exercise 1 and make a histogram for the num_flowers variable. Use the procedure in Exercise 2 to transform variables log_num_flowers and num_flowers_sq. You should have **3 plots**.
+
++ a. What did log-transforming and squaring your data do to the distributions? State your answer in terms of increasing or decreasing left or right skew.
+
++ b. Which data looks more normal: the original data, the log-transformed data, or the squared data?
+
++ c. Why did we add 1 to num_flowers when we log-transformed it but not when we square root transformed it? Would we need to add 1 if we log-transformed the variable dand_rosette_diam_cm?
+
+```{r}
+# library(readr)
+# library(ggplot2)
+
+### ALL CODE NESCESSARY TO ANSWER HOMEWORK QUESTION 2
+```
+[your text answer to question 2 here]
+
+
+## Homework Question 3
+We also might expect that the percent cover in a quadrat to vary with the distance to the nearest tree. Make a scatter plot like in Exercise 3 to explore this relationship using the variables dist_from_tree_m and percent_cover. You should have **1 plot**.
+
++ a. What trend do you notice in the data? Is the linear trend line (green line) a good representation of this trend?
+
++ b. What is the explanatory variable (x-axis)? What is the response variable (y-axis)?
+
+```{r}
+# library(readr)
+# library(ggplot2)
+
+##### HOMEWORK QUESTION 3 
+```
+[your text answer to question 3 here]
+

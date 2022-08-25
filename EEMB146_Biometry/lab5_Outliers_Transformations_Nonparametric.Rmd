@@ -1,0 +1,434 @@
+---
+title: "Lab5_Outliers_Transformations_Nonparametric"
+author: "Jacob Weverka, Caroline Owens, Sam Sambado"
+date: "1/25/2021"
+output: html_document
+---
+
+Biometry, EEMB 146, Week 5
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# BACKGROUND
+
+### 1. Violations of Assumptions
+
+One of our critical assumptions for one-sample and two-sample t tests is that
+the distribution of the sample means is normal. We have learned that if the
+distribution of our sample is **normal** we are guaranteed that the distribution of
+our sample **means** will be normal. Additionally, we have learned that the Central
+Limit Theorem tells us that if our sample size is big enough, the distribution of
+our sample means will be normal even if the distribution of our sample (or the
+population from which we drew this sample) is non-normal. 
+However, it is often the case in ecology that our samples are very non-normal
+and the Central Limit Theorem does not apply. This may be because the data
+are strongly skewed or because there are outliers in the data. In this lab you
+will learn how to deal with non-normal data and data with extreme outliers.
+
+### 2. Testing for Normality 
+
+We first have to check whether our data are normal. You already know how to
+do these (if not, please review week 4 video guide on normality):
+
+* **Histogram:** If the histogram is not "bell-shaped" this is your first
+indication that your data may be non-normal.
+
+* **QQplot:** If all data do not stay within the confidence band your data
+may be non-normal.
+
+* **Shapiro-Wilk Test:** A quantitative test that tells you whether your data
+are normal or not. $H_0$: Data are normal, $H_A$: Data are non-normal. If
+p < 0.05, reject your H_0 and conclude that the data are not normal, else
+"conclude" that your data are normal. Remember not to count on the results from
+this test alone, and always to visually examine a QQplot or histogram.
+
+* **NEW: Checking normality with residuals**
+
+This week we will introduce a method for checking the normality of residuals 
+after you have fit a linear model to your data. This allows us to check normality
+of more complicated relationships rather than just checking one variable at a time.
+
+### 3. Checking for outliers
+
+Outliers can drastically influence the results of t-tests and other parametric
+tests. It is always import to identify outliers before you begin your analysis.
+While there are formal methods for determining what constitutes an outlier, a
+simple method is to make a boxplot of your data. A boxplot will identify any 
+points that do not lie within a given range above or below the median of your
+data. This range can vary depending on how you build your boxplots, but typically
+the width of the boxplots is related to the first and third quartiles of your data. 
+In R, the default range is 1.5 times the distance between first and third quartiles.
+
+While sometimes outliers can be erroneous values (i.e. you measured something
+incorrectly) they often tell you something important about the population
+you are measuring. Therefore, **you cannot drop an outlier from your analysis** 
+**without having good reason to do so.** Good reasons could include measurement 
+error or an underlying difference between that individual and the rest of the 
+population (for example, the 100m sprint time for an athlete who was taking steroids).
+Dropping an outlier because it makes your life and the analysis easier is not a good 
+reason...though we all wish it was. However, it is good practice to run your analysis 
+with and without your outlier to determine if/how the outlier changes your results.
+
+### 4. Transformations
+
+When you **transform** your data you apply some function (often non-linear) to
+your data. Wait... why the heck can you do this? If you think about it, the scale
+that we use to measure things is completely arbitrary (think about Celsius vs
+Fahrenheit). We could just as easily measure things in a base 2 system and there
+would, in principal, be nothing wrong with that. If this helps, you can imagine
+that by transforming your data you are moving to an alien world where they measure 
+everything on a different scale (e.g. on a log scale). Here are some of the reasons 
+why we transform our data:
+
+* To make the data more normal
+* To make our variances more similar between groups
+* To reduce the influence of outliers
+* To make our data linear (we will see this in linear regression)
+
+#### 4.1 Choosing a transformation
+
+Here are some common transformations and the scenarios in which you may
+use them. The variable Y represents your original data and Y' represents your
+transformed data.
+
+* Consider **log transformation:** $Y' = \ln (Y)$ if...
+  + The measurements are ratios or products of variables
+  + The frequency distribution is right skewed
+  + The group having the larger mean also has the higher standard deviation
+  + The data span several orders of magnitude
+  + Note: If you have 0's in your data, you can do $Y' = \log{(Y + 1)}$
+  + In R, you can use the expression log(Y) to transform the data Y (remember that log(Y) gives the natural logarithm of Y)
+
+* Consider **Square-root transformation:** $Y' = \sqrt{Y}$ if...
+  + The measurements are count data
+  + The frequency distribution is right skewed
+  + Note: if you have negative numbers, you can't take the square root. You should add a constant to each number to make them all positive.
+  + In R, you can use the expression sqrt(Y) to transform the data Y
+
+* **Square transformations and antilog transformations:** $Y' = Y^2$ and $Y' = \exp Y$
+  + Use when your data are left skewed
+  + In R, you can use the expression Y^2 or exp(Y) to square transform or antilog transform the data Y, respectively.
+
+* **Arcsine transformation:** $Y' = \arcsin \sqrt Y$
+  + Useful when your data are proportions
+  + Note: Make sure your proportion data is represented as decimals (i.e. divide by 100)
+  + In R, you can use the expression asin(sqrt(Y)) to square-root arcsine transform the proportion data Y
+
+
+#### 4.2 After you transform your data
+
+Transformations are not magic. After you have transformed your data **you**
+**must retest all of your assumptions.** Moreover, transforming your data
+inherently changes your null hypothesis. For example, if I log transformed my
+number of flowers variable and then tested whether the means were different
+between the edge and the interior of a habitat patch, my $H_0$ becomes that there
+is no difference in the **log-mean.**
+
+**Any conclusions you make about your data have to be in terms of the transformation.** 
+For example, you would conclude that the log number of flowers on the edge was 
+significantly more than the log number of flowers in the interior.
+
+If a transformation does not fix your problem (e.g. make your data more normal, 
+reduce the heterogeneity of variance, etc.) you cannot proceed with your parametric 
+analysis. Fortunately, there are some non-parametric options that you can consider. 
+Remember that non-parametric does not assume that the data have any kind of distribution.
+
+# EXERCISES 
+
+#### 4.3 Examples of transformations in R
+
+Parasitoids are organisms, often arthropods, that develop inside their host and
+kill their hosts when they emerge (think the Alien movies...creepy). **Let's look at** 
+**the distribution of a parasitized planthoppers, Tumidagena minuta, across patches in a** 
+**salt marsh.**
+
+First things first. Read in your file and call it "parasitoid":
+
+```{r}
+
+# your code
+parasitoid  <- read.csv("parasitoids.csv")
+
+```
+
+Ok, now let's get an idea of what is in the file. View your data, retrieve a list of the headers, and look at a summary of the variables.
+
+```{r}
+
+# take a look at your data
+str(parasitoid)
+summary(parasitoid)
+
+```
+
+So there are two columns in the dataset - patch number and number of parasitoid hosts.
+Now, let's do some quick data visualization. Make a histogram of the number of parasitoid hosts. **What is the shape of the distribution - symmetrical or skewed?**
+
+```{r}
+
+#I'm including code for ggplot and base plot
+
+# make a histogram
+
+# ggplot 
+library(ggplot2)
+
+ggplot(parasitoid, aes(x = para_hosts)) +
+  geom_histogram()
+
+# base plot
+hist(parasitoid$para_hosts)
+
+#skewed
+
+
+```
+
+Let's say we wanted to use a statistical test that assumed normality. Make a QQ-plot and run the Shapiro-Wilk Test to further assess the normality of the variable para_hosts. Do you think this data would be normal enough to run a parametric test?
+
+```{r}
+
+## Step 1. qqPlot
+# code for a qqPlot
+library(car)
+# ?qqPlot() if you need help with the function qqPlot()
+
+ggplot(parasitoid, aes(sample = para_hosts)) +
+  geom_qq()
+
+qqPlot(parasitoid$para_hosts)
+
+
+## Step 2. Shapiro-Wilk test
+# your code for a shapiro-wilk test
+# ?shapiro.test() if you need help with the function qqPlot()
+
+
+```
+
+There is a pretty big departure from normality here, so I would not feel comfortable using this data as is. So what are our options? Well, the first one is to **try transforming the** **data.** The data are right skewed, so let's try a log and then a square-root transformation. *Remember, after transforming data you must test normality again with qqPlot and shapiro-wilk test.*
+
+```{r}
+
+##LOG TRANSFORMATION##
+parasitoid$log_para_hosts <- log(parasitoid$para_hosts+1) #make a new variable
+#Knowledge check: why did we add 1?
+
+hist(parasitoid$log_para_hosts,col='steelblue3',xlab="Log number of parasitoid hosts") #plot a histogram of the transformed data
+
+#Re-assess normality of transformed data
+qqPlot(parasitoid$log_para_hosts)
+shapiro.test(parasitoid$log_para_hosts)
+
+
+##SQRT TRANSFORMATION##
+parasitoid$sqrt_para_hosts <- sqrt(parasitoid$para_hosts) #make a new variable
+
+hist(parasitoid$sqrt_para_hosts,col='steelblue3',xlab="Sqrt number of parasitoid hosts") #plot a histogram of the transformed data
+
+#Re-assess normality of transformed data
+qqPlot(parasitoid$sqrt_para_hosts)
+shapiro.test(parasitoid$sqrt_para_hosts)
+
+
+```
+
+We see that neither log-transforming or sqrt-transforming our data made it normal. While, we may be able to invoke the Central Limit theorem on the fourth-root transformed data the interpretation of fourth- root transformed data might be a bit confusing. Therefore, a non-parametric test might be useful.
+
+### 5. Non-parametric tests
+
+Non-parametric tests make no assumptions about the distributions of the data
+and thus are robust to violations of normality. **When our data are not normal**
+**and we can't fix them with a transformation we typically turn to non-parametric**
+**tests.** You typically do non-parametric tests on your untransformed data. Transforming your data will not change the results of a non-parametric test, but it will change your interpretation of the results. Who wants to talk about medians of square-root transformed data when you don't have to? Keep in mind that non-parametric tests can be used with data that are normally distributed. **However, parametric tests that assume normality have more power, so you should use those if your data are normal.**
+
+We are only going to consider one non-parametric test in this lab: the
+Mann-Whitney U-test, aka **Wilcoxon Test**. These tests can be used in place of
+a two-sample t-test when your assumptions of normality are not met. However,
+there are still some assumptions for the Mann-Whitney U-test:
+
+* Assumes both samples are random samples from their populations
+* Assumes that the distributions of the two groups have similar shapes (i.e.
+similar variance and similar skew!). If this assumption is not met, then
+the Mann-Whitney U test is testing whether the shape of the two distributions are different rather than the central tendency.
+
+You have already learned about these tests in class. They rank your data
+(e.g. smallest value has a rank of 1 and the largest value has a rank of n) and
+then look at the distributions of these ranks. Note that while you can make
+similar conclusions with non-parametric tests, the $H_0$ and $H_A$ are not
+specified in terms of the mean, but rather whether the distributions
+of the two groups differ in central tendency (i.e. the median).
+
+The null hypothesis for a Mann-Whitney U-test is (assuming the variances are equal):
+
+$H_0$ : Median of group 1 equals the median of group 2 
+$H_A$ : Median of group 1 does not equal median of group 2
+
+Note that this is different than parametric tests, which are testing differences in means.
+
+#### 5.1 Mann-Whitney U-test/Wilcoxon Test in R
+
+Now let's walk through an example of how to do the Mann-Whitney U-test in R.
+We are going to use a dataset examining the hearing sensitivity in lions vs tigers.
+Higher numbers mean more sensitive hearing.
+
+Go ahead and load in the dataset mammals_hearing.csv and take a look at the data. Name the data hearing
+
+```{r}
+
+# your code
+
+hearing <- read.csv("mammals_hearing.csv")
+
+# look at your dataset
+
+str(hearing)
+dim(hearing) # 3 variables/columns, 80 observations/rows
+summary(hearing)
+```
+
+Now, visualize the data in a meaningful way. Make a histogram and boxplot. Also, check for normality using a QQ-plot and Shapiro-Wilk Test. What do you notice about the shape of the distribution? Are there any outliers? Are the data normal?
+
+```{r}
+
+# make a histogram and boxplot
+
+ggplot(hearing, aes(x = hearing)) + # dataset = hearing, variable of interest = hearing
+  geom_histogram() + # geom to make histogram
+  facet_wrap(~ mammal) + # make separate "facets" or grids of your group data by mammal type
+  theme_bw() # change the background 
+
+ggplot(hearing, aes(x = mammal, y = hearing)) +
+  geom_boxplot(fill = "grey89") + # geom to make boxplot, fill the boxplot with the color "grey89"
+  theme_classic() # change the background 
+
+shapiro.test(hearing$hearing)
+
+```
+
+The outliers are pretty noticeable here, so while we could perform some transformations, let's move right to non-parametric tests to remove the effect of the outliers.
+
+The main assumption that we should test for is whether the distributions of the two groups have similar shapes (i.e.similar variance and similar skew). Let's do that now. Make a histogram for each mammal type. Use Levene's Test to check for equal variances.
+
+```{r}
+
+#Split up your histogram by mammal species; remember you can use [] to index your data
+hist(hearing$hearing[hearing$mammal=="tiger"])
+hist(hearing$hearing[hearing$mammal=="lion"])
+
+#Run Levene's Test; (y~x) or (y,x)
+leveneTest(hearing$hearing~hearing$mammal)
+
+```
+
+Levene's Test gives p= 0.98, so we cannot reject the null hypothesis. This is strong evidence that the variances of these distributions are not different. We therefore can use a Mann-Whitney U-test which assumes that the distributions have the same shape.
+
+```{r}
+# Run a Mann-Whitney U-test/Wilcoxon Test 
+wilcox.test(hearing ~ mammal, data=hearing)
+
+```
+
+Based on the above results we can conclude that lions and tigers do not have
+equally sensitive hearing. Note that the W statistic (or the U statistic) is
+analogous to a t or Z statistic: it comes from a distribution from which you can
+determine its associated p-value.
+
+We can also find the medians of each group:
+
+```{r}
+
+median(hearing$hearing[hearing$mammal == "tiger"], na.rm=T)
+median(hearing$hearing[hearing$mammal == "lion"], na.rm=T)
+```
+
+From this, we can see that tigers actually have a higher median hearing frequency than
+lions.
+
+### Appendix: Testing normality with residuals
+
+We've discussed how to test normality of individual variables within a dataset. As we begin to build more complex models, we really are interested in whether the **residuals** of those models are normally distributed. Here's a sneak peek into how to test this (see lab 5 video for more info):
+
+```{r}
+
+# Example using the mammals_hearing dataset
+hearing <- read.csv("mammals_hearing.csv")
+fit <- lm(hearing~mammal,data=hearing) #run a linear model. lm(y~x) fits the equation y=mx+b
+res=fit$residuals #retrieve the residuals from the model
+
+#What is a residual? http://www.statsmakemecry.com/smmctheblog/confusing-stats-terms-explained-residual.html
+
+#Are the residuals normally distributed?
+shapiro.test(res) #p>0.05 so we cannot reject the null; suggests that the data are normal
+qqPlot(res) #this can also be found within the diagnostic plots obtained from plot(fit)
+hist(res)
+
+```
+# HOMEWORK
+
+### **Question 1: Dandelions and the habitat edge**
+
+Load the plant_data.csv dataset and try to answer the following question:
+
+**Is there a difference in the number of dandelion leaves per rosette between dandelion 0m from the habitat edge and 6m from the habitat edge?**
+
+Use the num_leaves_in_rosette column and the dist_from_edge_m column to answer this question. You will have to subset your data to only include the plants from 0m and 6m. To do this, do the following:
+
+```{r}
+
+## YOU WILL NEED TO MODIFY THE DATASET (DAT) AND VARIABLE NAMES
+#subset your data
+# sub_plant = DATASET[DATASET$VARIABLE != "3.0m", ]
+
+#drop unused levels
+# droplevels(sub_plant$dist_from_edge_m)
+# sub_plant$dist_from_edge_m <- factor(sub_plant$dist_from_edge_m)
+
+#check to see if 3.0m is dropped
+# levels(sub_plant$dist_from_edge_m)
+# View(sub_plant) #remove View() command before knitting your Rmd
+
+```
+
+After you have subsetted your data, perform the following analysis:
+
+  * Look at **histograms and boxplots** of *num_leaves_in_rosette* at 0.0m and 6.0m. Based on these boxplots, are there any outliers? What is the shape of each distribution?
+
+  * Check the **assumptions of normality** of *num_leaves_in_rosette* at 0.0m and 6.0m from the habitat edge using the **residuals** (see appendix for how to do this). Are the residuals normal or not normal? Show a **QQ-plot** and a **Shapiro-Wilk** statistic.
+
+  * If your assumptions of normality were not met (and you don't think the CLT would apply), **transform the data** using an appropriate transformation (see Section 4).
+
+  * Specify what transformation you used (you can try a couple, but just report one!) and **retest your normality assumptions** and check again for outliers. Show me the **QQplot and Shapiro-Wilk** statistic for the **residuals** of a transformed variable. Do you feel confident assuming normality?
+
+  * Based on your answer to the above question, perform the **appropriate two-sample test** (e.g. t-test (parametric) or Mann-Whitney U-test/Wilcoxon Test (non-parametric)). For whatever test you choose:
+
+
+
+A. Clearly **state your null and alternative hypotheses**. Remember, these hypotheses will change based on transformations and whether or not you are running a non-parametric test so you may have to update them!
+
+B. Check your homogeneity of variance assumption and **report the p-value from your Levene's Test**. Remember, you have to test this assumption even if you are using a Mann-Whitney U-test. If you reject this assumption you can still do a Mann-Whitney U-test, but you have to be careful whether you null hypothesis is that the medians are different between the two groups or that the shapes of the distributions are different between the two groups.
+
+C. Show your **test statistic** and your **p-value** for your test.
+
+D. Clearly state your conclusion regarding how the **number of leaves in a rosette** differs between 0m from the habitat edge and 6.0m from the habitat edge. Provide a one to two sentence biological interpretation of your conclusion (no right answer here, just make sure it is logical and complete).
+
+### **Question 2: Starving crickets**
+
+Example 13.5 in Whitlock and Schluter: The sage cricket has an unusual form of mating. During mating, the male offers his fleshy hind wings to the female to eat. The wounds are not fatal, but a male with already nibbled wings is less likely to be chosen by females he meet subsequently. Females get some nutrition from feeding on the wings, which raises the question, "Are females more likely to mate if they are hungry?" Johnson et al. (1999) answered this question by randomly dividing 24 females into two groups: one group of 11 females was starved for at least two days and another group of 13 females was fed during the same period. Finally, each female was put separately into a cage with a single (new) male, and the waiting time to mating was recorded.
+
+Load in the data file starving_crickets.csv and perform the following steps:
+
+A. Clearly **state your null and alternative hypotheses**.
+
+B. **Visualize** your data in some meaningful way and show this plot in your report.
+
+C. Test whether the two groups of crickets (starved and fed) follow a normal distribution by **testing the normality of the residuals** (see appendix for how to do this). Are the residuals normal or not normal? Show a **QQ-plot and a Shapiro-Wilk** statistic.
+
+D. Try one **transformation on your data** that you think is reasonable (note: you can try more than one, but only include one in your homework). **Retest your normality assumptions**, give the **QQ-plot** and the **Shapiro-Wilk** statistic, and report whether this transformation made the data normal.
+  
+E. Test the assumption that the variances between the two groups is equal for either the transformed or untransformed data, depending on what you are going to analyze. Show me the resulting Levene's test p-value. Interpret your Levene's Test p-value.
+
+F. Based on your results above, test your hypothesis using the appropriate two-sample test and give the results of the test. State your conclusions in terms of rejecting or failing to reject your null hypothesis. Based on your result, give a logical explanation on why you think female crickets eat the male crickets' wings.

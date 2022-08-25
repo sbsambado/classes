@@ -1,0 +1,326 @@
+---
+title: "Lab 6 ANOVA"
+author: "Tatum Katz, Sam Sambado"
+date: "2/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# packages needed for lab 6
+library(readr)
+library(tidyverse)
+library(car)
+library(ggplot2)
+library(multcomp) # new package alert! Make sure to install.packages("")
+library(MASS)
+
+# datasets needed for lab 6
+hand_wash <- read_csv("hand_washing.csv")
+malaria <- read_csv("malaria_vs_maize.csv")
+eggs <- read_csv("cuckooeggs.csv")
+
+```
+
+# BACKGROUND
+
+### Analysis of Variance (ANOVA)
+We have now seen many different ways to compare the means of two groups. However, what if we have more than two groups? Unfortunately, we can’t just use a bunch of pairwise t-tests because this would inflate our Type I (\alpha) error. ANOVA is the answer. It gives us a robust and powerful away to determine whether the means of two or more groups are different from each other. There are a couple terms that we need to familiarize ourselves with before we start using ANOVAs. 
+
++ **Factor**: Our variable of interest that we are changing. For example, if we were comparing the mean hearing frequency between different felines the factor would be feline and it would have different levels (i.e lion, tiger, and puma). 
+
++ **Level/group/treatment**: The levels of a factor are the groups that we are comparing. For example, the levels of the factor feline are lion, tiger, and puma.
+
+### Assumptions of the ANOVA
+Here are the assumptions of the ANOVA and how we test them:
+
+1. Measurements from each group (level) represent a random sample from the corresponding population 
+
+  + Ensure that this assumption is met with your experimental design
+
+2. Our response variable is normally distributed for each population 
+
+  + Test this assumption with a Q-Q plot and a Shapiro-Wilk test of the residuals
+
+3. The variance is the same in all k populations (homogeneity of variance) 
+
+  + Test this assumption with a residual plot or a Levene’s Test. We will talk about how to test these assumptions in section 2.2.
+
+
+### Hypotheses of the ANOVA
+If we are comparing the means of k populations, the $H_0$  and $H_A$  of a one-way ANOVA are:
+
++ $H_0$ : The mean of group 1 = mean of group 2 = mean of group k
+(μ_1= μ_2 = ... =μ_k)
+
++ $H_0$ : At least one mean across the groups (μ_j) is not equal
+
+These hypotheses assert that any observation i from group (level) j, y_ij, can be calculated using the following equation: y_ij=μ_j+ϵ_ij
+
+Where ϵ_ij is an error associated with the i measurement from group j and is normally distributed with mean 0 and some variance σ2ϵ. The variance σ2ϵ is constant for all levels. This is just fancy notaiton for restating our two assumptions: 
+
+  1) Normality 
+  2) Equality of Variance
+
+We could equivalently state the null hypotheses for the ANOVA as
+$H_0$ :α_1 = α_2 =....= α_j =...= α_k =0
+
+$H_A$ :At least one α_j is not equal to 0
+
+In this case, α_j, is just the deviation of group j from the grand mean μ. The grand mean is the mean of all assumptions pooled across groups. If all these deviations are 0, there is no difference between our means. These hypotheses assert that any observation i from group (level) j, y_ij, can be calculated using the following equation
+y_ij=μ+α_j+ϵ_ij
+
+Equation [eq:effects] and equation [eq:means] are equivalent.
+
+If we reject our $H_0$, we have no information about which means are different, just that at least one is different.
+
+**Resources for more R ANOVA tutorials**
+
++ ANOVA blog
+https://medium.com/@StepUpAnalytics/anova-one-way-vs-two-way-6b3ff87d3a94
+
++ Introduction to ANOVA video
+https://www.youtube.com/watch?v=FLyCZnjuJVA&feature=youtu.be
+
+# EXERCISES 
+
+**A. Washing your hands: Does it help?**
+Let’s start by asking the following question: Which hand washing method more effectively removes bacteria: washing with water (W), soap (S), anti-bacterial soap (AB), or alcohol (A)? Our factor in this analysis is washing method and it has 4 levels: W, S, AB, A. Our hypotheses are:
+
++ $H_0$: α_W=α_S=α_AB=α_A=0
+
++ $H_A$: At least one α_j is not equal to 0
+
+Always make sure you know what your factor and its levels are before beginning an ANOVA. Otherwise, things can get really confusing. Okay, let’s begin the analysis.
+
+First, lets load in the dataset **hand_washing.csv** and look at it to get a sense of what’s going on.
+
+```{r}
+##read in your data and check out how its structured 
+hand_wash<-read.csv("hand_washing.csv")
+
+dim(hand_wash) # 32 observations/rows, 2 variables/columns (CLT wouldn't apply)
+
+str(hand_wash) # washing_method = data type is 'chr', we should change it to factor for these analyses
+# transform washing_method into a factor
+hand_wash$washing_method <- as.factor(hand_wash$washing_method)
+str(hand_wash) # washing_method = 'chr', won't work for the mcp()
+
+# another way to see the different levels in a factor
+# HINT: unique(dataset$variable)
+unique(hand_wash$washing_method) # 4 levels
+```
+
+You’re going to need to use the car and mulcomp packages. You should have the car package already installed, if you’ve done that before you can just use uncomment and run the library() line for car. However for multcomp you will need to install the package first and then call it with library.
+
+```{r}
+library(car)
+## Loading required package: carData
+#install.packages("multcomp")
+library(multcomp)
+```
+
+
+
+Now lets visualize the data with a boxplot:
+```{r}
+boxplot(bac_colonies~washing_method,
+        data=hand_wash,
+        xlab="Washing method",ylab="Bacteria colonies") #one outlier
+
+unique(hand_wash$washing_method)
+with(hand_wash,hist(bac_colonies[washing_method=="ab_soap"])) # remember [ ] selects for objects 
+
+
+```
+
+Notice that in general, the variances of each level seem pretty comparable in the boxplot. Moreover, the data don’t look like they violate normality too severely, though there is one outlier.
+
+### Checking our assumptions
+To test our assumption we need to look at the **residuals** of our ANOVA model. Residuals are defined as:eij=yij−yj¯
+
+In words, this says the residual eij is equal to the *observed* value (yij) minus the *predicted* value (ŷ ij−y¯js)
+
+Reiduals are useful for testing our assumptions because they are estimates of our error terms ϵij. Therefore we should expect that our residuals should be normally distributed and that they should have approximately equal variances.
+
+**For more info on residuals:** http://www.statsmakemecry.com/smmctheblog/confusing-stats-terms-explained-residual.html
+
+To get our residuals, we first need to run our ANOVA. We will use the funciton **aov()** which is very similar in terms of output and structure to lm(), but will calculate ANOVA results instead of regression results!
+
+```{r}
+
+# HINT: aov(y ~ x, data = dataset)
+
+wash1 <- aov(bac_colonies~washing_method, data=hand_wash) #run the ANOVA
+par(mfrow=c(2,2)) # places 2 plots on 1 output view
+plot(wash1) #look at the diagnostic plots; focus on the first two plots (fitted vs residuals & QQ plot)
+
+par(mfrow=c(1,1)) # resets output view
+
+
+## extract residuals
+
+res=wash1$residuals #retrieve the residuals
+
+```
+
+While all the plots on this graph are useful, the two that we will focus on are the plots in the first row. 
+
+1. The first plot is called a residual plot and it is used to test our **Homogeneity of Variance (homoskedasticity)** assumption (i.e. plot titled *“Residuals vs. Fitted”*). It plots the values predicted by our ANOVA model (see equation [eq:means] and [eq:effects]) against the residuals of the model. If the residuals fall along the zero line for each treatment and don’t have any distinct pattern then we can be pretty confident that our assumption of equal variances is met. If this plot shows a distinct pattern, such as a wedge shape, there is good evidence that our assumptions of homogeneity of variance are not met and we might want to try a transformation.
+
+2. The other plot that is useful in is the qqplot of the residuals (i.e. plot titled *“Normal Q-Q”*). You have already seen a lot of the qqPlot so you know that if it deviates from a straight line the residuals likely do not follow a normal distribution. This would violated the **normality assumption** of the ANOVA.
+
+We have run the ANOVA model! Be warned, we cannot interpret the results until we check the residuals! R has been incredibly helpful and already calculated the residuals for us. Now our residuals are saved in the variable res. With this done, let’s check some of our assumptions.
+
+**Normality**: Run a Shapiro-Wilk test on res.
+```{r}
+
+# Tool 1 for checking normality
+hist(res)
+
+# Tool 2 for checking normality
+qqPlot(res) 
+
+# Tool 3 for checking normality
+
+shapiro.test(res) ## W = 0.96575, p-value = 0.3911
+
+```
+
+P-value (0.3911) > 0.05 so we cannot reject the null; suggests that the data are normal. Now lets check our next assumption.
+
+**Homogeneity of Variance:** Run a Levene’s Test on the stacked data just like you have been doing for the last few weeks. I get a p-value of 0.9106.
+```{r}
+
+leveneTest(bac_colonies~washing_method,hand_wash) # F value = 0.1777, p-value =  0.9106
+
+# some of you have been asking about the red output 'group coerced to factor' this is not an error, just a message saying the function leveneTest transformed your washing_method from a character to factor because the function has the argument that your factor needs to be a factor and not a character
+
+str(hand_wash) # you can see that washing_method is considered a chr or factor in this dataset, if you followed the above code we transformed it into a factor after we called in the data
+```
+
+P-value (0.9106) > 0.05, so the variances are equal.
+
+So are the assumptions met? Or do you need to try a transformation? (refer to lab 6)
+
+### Analyzing the ANOVA
+Once we have confirmed that our assumptions are met we can analyze the ANOVA. For the hand washing data, we met both our assumptions of normality and homogeneity of variance, so we can analyze the model.
+
+```{r}
+# we actually already ran the anova when we created the residuals as a reminder we did it with:
+# HINT: aov(y ~ x, data = dataset)
+wash1 <- aov(bac_colonies ~ washing_method, data=hand_wash)  
+#So now we just need to get the results with:
+summary(wash1) ## THIS IS THE ANOVA TABLE WE ARE REFERRING TO IN HW QUESTION 1E
+```
+
+As described in class, this table contains all of the information that was required to run the ANOVA. We see that we obtained an F-value of 7.064 and a p-value (0.001111) less than 𝛼=0.05 allowing us to reject the null hypothesis and conclude that at least one hand washing method is significantly more or less effective at removing bacterial colonies than the others.
+
+### Post-hoc Comparisons
+We just concluded from the above ANOVA that at least one of the means differ, but we often want to see which groups actually differ. We know we can’t do a bunch of t-tests because that will inflate our Type I error rate. We are instead going to use a method called a **Tukey-Kramer** test, which controls our Type I error rate. Here are some important notes about the Tukey-Kramer test:
+
++ The Tukey-Kramer test assumes that you have already run an ANOVA and rejected your null hypothesis
+
++ The Tukey-Kramer test does pairwise comparisons for all the groups we are testing and controls the family-wise Type I error rate so it is at most 𝛼=0.05 (it could be less).
+
++ When your ANOVA is unbalanced (unequal sample sizes in each group), the Tukey-Kramer test is conservative, meaning that the family-wise Type I error is less than 𝛼 and it is harder for us to reject the null.
+
++ The Tukey-Kramer test makes all of the same assumptions as the ANOVA
+
+To run a Tukey-Kramer test for our hand-washing ANOVA
+```{r}
+# HINT: TukeyHSD(aov_model)
+TukeyHSD(wash1)
+
+```
+
+A fancier way of doing this:
+```{r}
+# Use the function glht in the multcomp package
+
+# HINT: glht(ANOVA_MODEL, linfct = mcp(FACTOR = "Tukey)
+?glht() # you'll see you need to have a factor for your mcp(argument)
+
+Post_hoc <- glht(wash1, linfct = mcp(washing_method = "Tukey")) # if washing_method is not a factor when you ran the wash1 anova, the glht() will not work
+
+summary(Post_hoc) 
+
+confint(Post_hoc) # shows your lower and upper CI bounds 
+cld(Post_hoc) #compact letter display of Tukey groups
+
+par("mgp")
+#par(mpg = c(3, 1, 0))
+plot(Post_hoc, main = "Fig 1: 95% confidence level", cex.axis = .3) #confidence intervals plotted
+# the mean number of bacterial colonies on alcohol is significantly different than all other levels (alcohol = a, the rest of the levels = b)
+# (has a different letter and CIs don't overlap with 0 and p-values significant)
+
+
+?par()
+```
+
+
+The plot of the confidence intervals generated from the Tukey-Kramer test for every pairwise combination of the groups. To interpret the table, notice that we see every pairwise combination of the levels of our factor. For each of these pairs, the Tukey-Kramer test has run a two-sample t-test and controlled for the family-wise Type I error. For example, alcohol - ab_soap == 0 is referring to a pairwise test of whether the mean number of bacteria colonies after an alcohol wash is different than after washing with anti-bacterial soap (i.e. is the difference zero). We see that the t=−2.929 and p=0.03193 allowing us to conclude that there are significantly less bacterial colonies after washing your hands with alcohol than after washing your hands with anti-bacterial soap.
+
+It is also really useful to look at the letters at the bottom of the output. Notice that ab_soap, soap, water all are labeled with the letter “b” and alcohol is labeled with the letter “a”. If two levels share a letter they are not significantly different. If they do not share a letter they are significantly different. Notice that alcohol does not share a letter with any of the other levels; therefore the mean number of bacterial colonies on alcohol is significantly different than all other levels. Looking at our t-values we can see that there are significantly fewer bacterial colonies after hands are washed with alcohol.
+
+Similarly, the Fig 1 displays the 95% family-wise CIs for each pairwise comparison. If the interval does not overlap with 0, we can conclude that the two treatments are different. Because we used the Tukey-Kramer test, if we repeated this experiment 100 times we would falsely reject one of our 6 pairwise comparisons no more than 5 times.
+
+# HOMEWORK
+
+### **Question 1**
+
+The pollen of the corn (maize) plant is known to be a source of food to larval mosquitoes of the species Anopheles arabiensis, the main vector of malaria in Ethiopia. The production of maize has increased substantially in certain areas of Ethiopia recently, and over the same time malaria has entered in to new areas where it was previously rare. This raises the question, is the increase of maize cultivation partly responsible for the increase in malaria? One line of evidence is to look for a geographical association on a smaller spatial scale between maize production and malaria incidence. The data set **malaria_vs_maize.csv** contains information on several high-altitude sites in Ethiopia, with information about the level of cultivation of maize (low, medium or high) and the rate of malaria per 10,000 people. Use an ANOVA to test *whether there is a difference in the mean number of malaria cases between the three levels of cultivation*.
+
+  A. Clearly state your **null and alternative hypotheses**
+
+  B. Show me a **box plot** (or a means plot) of the data. How many levels are we testing?
+
+  C. Test the assumptions of normality and homogeneity of variance using the diagnostic plots (i.e. the **residual plot and the qqPlot**) and the **Shapiro-Wilk test and the Levene’s Test**. Based on these tests, what do you conclude about your normality and homogeneity of variance assumptions?
+
+  D. If your assumptions aren’t met try **transforming malaria_cases_per_1000**. After your transformation, **retest your assumptions using the transformed data** with diagnostic plots (i.e. the residual plot and the qqplot) and the Shapiro-Wilk test and the Levene’s Test. Find a transformation that allows for both assumptions to be met. Just report this transformation.
+
+  E. Run an **ANOVA on your transformed data**. Include the ANOVA table generated in the analysis. Using the ANOVA table, conclude whether the level of cultivation significantly affects the number of malaria cases. You don’t need to do any pairwise comparisons for this exercise.
+
+### **Question 2**
+
+The European cuckoo does not look after its own eggs, but instead lays them in the nests of birds of other species. Cuckoos sometimes have evolved to lay eggs that are colored similarly to the host birds’ eggs. Is the same true of size – do cuckoos lay eggs of different sizes in nests of different hosts? The data file **cuckooeggs.csv** contains data on the lengths of cuckoo eggs laid in a variety of other species’ nests.
+
+Use an ANOVA to test for *a difference in cuckoo egg size for different host species*. Specifically:
+
+  A. Clearly state your **null and alternative hypotheses**
+
+  B. Show me a **box plot** (or a means plot) of the data. How many levels (groups) are we testing? 
+  
+  C. Test the **assumptions of normality and homogeneity of variance** using diagnostic plots (i.e. residuals plots and QQplots) and a Shapiro-Wilk test and a Levene’s Test. What do you conclude about your assumptions of normality and homogeneity of variance?
+
+  D. If your assumptions aren’t met try a transformation. Otherwise, proceed with your analysis.
+
+  E. Include the **ANOVA table** generated from the analysis. Conclude whether cuckoos lay different size eggs in different bird nests.
+
+  F. Perform a **Tukey-Kramer Test** for multiple comparisons. For what bird species does the cuckoo lay the significantly smallest eggs?
+
+### **Question 3**
+
+To get started on this exercise do the following. Save your current Rmarkdown file. You will not be adding any additional code to your Rmarkdown, just the text for the answers to this exercise.
+
+Open the script **power_anova.R** in your R studio. You can do this by going to File →Open File…
+
+You are interested in testing the efficacy of different “home remedies” as hangover cures. After testing many different home remedies, you believe that pickle juice is an effective hangover cure. You want to compare its effectiveness of curing hangovers to a control (nothing consumed) and a procedural control (water consumed). You measure effectiveness by the amount of time it takes for one’s head ache, sensitivity to bright light, and feelings of nausea to dissipate after taking one of the given treatments. You determined that this response variable was normally distributed and you want to run a one-way ANOVA. Your factor is home remedy and your levels are nothing, water, and pickle juice.
+
+Based on some preliminary data you collected *pre-pandemic* on Saturday morning in IV, you suspect that the mean hangover recovery time after drinking pickle juice is around 124 minutes and the mean recovery time after not drinking anything is 180 minutes. Drinking water falls somewhere in between. Moreover, your preliminary analysis allowed you to estimate the standard deviation for each of these treatments as approximately ±70 minutes.
+
+
+A. In 2 - 3 sentence, discuss two factors that could bias your experiment
+
+B. Use a power analysis to determine *how many students you will need to sample* (for each level) to detect a *significant effect of pickle juice as a hangover cure* (given that one exists). Use the script **power_anova.R** to answer this question 
+  
+  + You can run all the code by typing “Control-a” (to highlight all the code) and “Control-r” (to run all the code). On a Mac, this will be “Command-a” and “Command-Enter”. It will take a few seconds to run, so be patient. 
+    
+  + From the plot that appears, determine approximately how many students you will need in each group to have a power of 0.8
+
+C. A friend of yours has collected some additional data and suggests that the standard deviation of your three treatments is closer to 90 minutes. In your R code, *change the variable STD to 90 minutes* and determine how many students you would need to sample.
+
+D. Finally, you stumble upon a jar of Kirkland pickle juice and some preliminary tests show you that it might drop your the approximate mean hangover recovery time to 74 minutes. With this new information, and with STD=90, *change PICKLEMEAN to 74* and re-run your power analysis. How many students do you need to sample now in order for your test to have a power of 0.8?
+
+E. In one 1 to 2 sentences, draw some general conclusions on how the variance of your populations and the difference between your maximum and minimum mean of your levels influence the power of the ANOVA.
