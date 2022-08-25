@@ -1,0 +1,138 @@
+---
+title: "Lab3"
+author: "sbsambado"
+date: "12/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(boot)
+library(naniar)
+library(simputation)
+
+penguins <- read_csv("penguins.csv")
+```
+
+Wrangling
+```{r}
+male_p <- penguins %>% 
+  filter(sex == "MALE")
+
+ggplot(male_p, aes(x = flipper_length)) +
+  geom_histogram(bins =12) +
+  theme_light()
+
+# pull length as a vector
+
+flippers <- male_p %>% 
+  pull(flipper_length)
+```
+
+###3. Create a function, do some bootstrapping:
+
+```{r}
+# Create a function to calculate the mean of varying vectors (x) of index (i)
+mean_fun <- function(x, i) {mean(x[i])}
+
+# First try - 10 bootstrap samples (silly to do in practice, good for demonstration)
+# 10 bootstrap samples: 
+
+boot_10 <- boot(flippers, mean_fun, R = 10)
+
+# Reporting outcomes of bootstrapping: 
+boot_10$t # to report means of all 10 bootstrap samples
+boot_10$t0 # to report the mean of the original sample
+boot_10
+
+# But I'm not actually entirely sure why this works...
+ggplot() +
+  aes(boot_10$t) + 
+  geom_histogram()
+
+# 100 bootstrap samples: 
+boot_100 <- boot(flippers, mean_fun, R = 100)
+ggplot() +
+  aes(boot_100$t) + 
+  geom_histogram()
+# 1000 bootstrap samples: 
+boot_1000 <- boot(flippers, mean_fun, R = 1000)
+ggplot() +
+  aes(boot_1000$t) + 
+  geom_histogram()
+
+# 10000 bootstrap samples: 
+boot_10000 <- boot(flippers, mean_fun, R = 10000)
+ggplot() +
+  aes(boot_10000$t) + 
+  geom_histogram()
+# 100000 bootstrap samples:
+boot_100000 <- boot(flippers, mean_fun, R = 100000)
+ggplot() +
+  aes(boot_100000$t) +
+  geom_histogram()
+boot_100000$t0 # to report the mean of the original sample
+boot_100000 # to report bias, SE
+
+```
+
+###4. Find a bootstrapped confidence interval:
+
+```{r}
+boot.ci(boot_100000, conf = 0.95) # Notice here: pretty similar across CI methods
+# For comparison, what does the CI look like for the original sample based on the t-distribution? 
+t.test(flippers)
+```
+
+What else? We could also bootstrap the median, for example - which we couldn't get a measure of uncertainty for if we only had our single sample. You could write that function...
+
+##B. Assessing missingness, and an imputation example (w/ airquality dataset)
+
+Using the naniar package by Nick Tierney (there are others...this one seems straightforward and I wanted to try it out) 
+
+**Note**: These examples are taken/updated directly from Nick Tierney's package documentation + vignettes. More here: <https://cran.r-project.org/web/packages/naniar/vignettes/getting-started-w-naniar.html>
+
+```{r}
+# visualizing missings
+
+vis_miss(airquality)
+
+# visualize numbers of missing by variable
+gg_miss_var(airquality, facet = Month)
+
+ggplot(airquality, aes(x = Ozone, y = Solar.R))+
+  geom_miss_point()
+
+ggplot(airquality, aes(x = Ozone, y = Solar.R))+
+  geom_point()
+
+ggplot(airquality, aes(x = Ozone, y = Solar.R))+
+  geom_miss_point() +
+  scale_color_manual(values = c("orange", "purple"))+
+  facet_wrap(~Month)+
+  theme_minimal()
+```
+
+Make a shadow matrix of NA values (a tibble just showing which values are NA vs !NA)
+```{r}
+na_shadow <- bind_shadow(airquality)
+```
+
+Imputation by linear regression (using simputation pkg), and visualize:
+```{r}
+airquality %>% 
+  impute_lm(Ozone ~ Temp + Wind) %>% 
+  ggplot(aes(x = Temp, y = Ozone))+
+  geom_point()
+
+
+# But wouldn't it be nice to show which ones are actually imputed? YES. Luckily we made a shadow matrix..
+
+na_shadow %>%
+  impute_lm(Ozone ~ Temp + Wind) %>% 
+  ggplot(aes(x = Temp, y = Ozone, colour = Ozone_NA)) + 
+  geom_point()
+```
+

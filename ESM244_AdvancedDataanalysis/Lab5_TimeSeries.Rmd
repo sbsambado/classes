@@ -1,0 +1,162 @@
+---
+title: "Lab5_Timeseries"
+author: "sbsambado"
+date: "1/10/2021"
+output: html_document
+---
+
+Lab Week 5 Objectives:
+
+- Intro to time series data class (ts)
+- Graphing ts data
+- Decomposing ts data
+- Exploring autocorrelation
+- Holt Winters and ARIMA preview
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+TimeSeriesData <- ts(DataVector,
+frequency = ?,
+start c(Year, IntervalStart))
+
+frequency = 
+12: Monthly Data
+4: Quarterly Data
+7: Weekly Data
+
+or deltat = ?
+
+1/52: Weekly
+1/365: Daily
+
+```{r}
+library(tidyverse)
+library(tseries)
+library(forecast)
+```
+
+```{r}
+
+energy <- read_csv("energy.csv")
+
+# convert to ts data
+
+res_ts <- ts(energy$res_total, frequency = 12,
+              start = c(1973, 1))
+
+plot(res_ts)
+```
+For each, we should ask ourselves:
+- Is there a trend?
+- Do data look additive or multiplicative? 
+- Is there seasonality? 
+- Are there notable outliers? 
+
+d. Decompose to start exploring the data further
+```{r}
+res_dc <- decompose(rest_ts)
+plot(res_dc)
+
+# Changes within each month over years recorded:
+monthplot(res_ts)
+
+ggseasonplot(res_ts)+
+  theme_bw()
+
+
+```
+
+
+f. Simple moving average to smooth (changing the averaging window)
+```{r}
+# Have them see what happens when they change the moving window...
+
+sma_res <- ma(rest_ts, order = 5)
+plot(sma_res)
+
+# Just view the moving average on its own: 
+plot(sma_res)
+# Or in combo with the original data
+plot(res_ts)
+lines(sma_res, col = "red")
+```
+
+g. Exploring autocorrelation (ACF) - two ways
+```{r}
+
+res_acf <- acf(res_ts)
+
+ggtsdisplay(res_ts)
+
+#Not surprising: strong seasonality is dominant. There appears to be some trend. It looks relatively additive. Can we test for stationarity? 
+
+```
+
+h. Augmented Dickey-Fuller test for stationarity
+
+Hypothesis test: null is that the data are NOT stationary. If p < 0.05, we reject the null hypothesis and retain the alternative hypothesis that the data ARE stationary.
+```{r}
+adf_res <- adf.test(res_ts)# Yes, stationary
+adf_res  # p-value = 0.01
+```
+
+i. Holt Winters exponential smoothing
+```{r}
+# Exponential smoothing: no normality assumption (unbiased)
+# Perform Holt Winters
+
+res_hw <- HoltWinters(res_ts)# See smoothing parameters with res_hw
+plot(res_hw)
+
+# Then forecast
+res_forecast <- forecast(res_hw, h = 60)
+plot(res_forecast)
+
+#Then check the residuals:
+hist(res_forecast$residuals) # looks normal distributed
+```
+
+j. Autoregressive integrated moving average (ARIMA) using auto.arima for p, d, q
+
+- Use auto.arima to estimate pdq
+```{r}
+res_pdq <- auto.arima(res_ts) # [1,0,2][0,1,1]
+res_pdq
+```
+
+- Fit the ARIMA model
+```{r}
+res_arima <- arima(res_ts, order = c(1,0,2),
+                   seasonal = list(order = c(0,1,1)))
+```
+
+- Evaluate residuals (look good)
+```{r}
+par(mfrow = c(1,2))
+hist(res_arima$residuals)
+qqnorm(res_arima$residuals)
+```
+
+- Look at the forecasting...
+```{r}
+
+forecast_res <- forecast(res_arima, h = 72)
+plot(forecast_res)
+```
+
+- And view this in ggplot (if time)?
+```{r}
+res_df <- data.frame(forecast_res)
+month_seq <- seq(1,72)
+
+res_df_2 <- data.frame(month_seq, res_df)
+
+ggplot(res_df_2, aes(x = month_seq, y = Point.Forecast))+
+  geom_line()+
+  geom_ribbon(aes(ymin = Lo.95, ymax = Hi.95, alpha = .2))+
+  theme_minimal()
+```
+
